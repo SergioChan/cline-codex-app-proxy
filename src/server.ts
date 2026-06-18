@@ -1,4 +1,6 @@
 import { createAnthropicAdapter } from "./adapters/anthropic";
+import { createAzureAdapter } from "./adapters/azure";
+import { createGoogleAdapter } from "./adapters/google";
 import { createOpenAIChatAdapter } from "./adapters/openai-chat";
 import { createResponsesPassthroughAdapter } from "./adapters/openai-responses";
 import { bridgeToResponsesSSE, buildResponseJSON, formatErrorResponse } from "./bridge";
@@ -17,6 +19,10 @@ function resolveAdapter(providerConfig: OcxProviderConfig) {
       return createAnthropicAdapter(providerConfig);
     case "openai-responses":
       return createResponsesPassthroughAdapter(providerConfig);
+    case "google":
+      return createGoogleAdapter(providerConfig);
+    case "azure-openai":
+      return createAzureAdapter(providerConfig);
     default:
       throw new Error(`Unknown adapter: ${providerConfig.adapter}`);
   }

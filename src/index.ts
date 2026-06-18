@@ -2,6 +2,8 @@ export { startServer } from "./server";
 export { parseRequest } from "./responses/parser";
 export { bridgeToResponsesSSE, buildResponseJSON, formatErrorResponse } from "./bridge";
 export { createAnthropicAdapter } from "./adapters/anthropic";
+export { createAzureAdapter } from "./adapters/azure";
+export { createGoogleAdapter } from "./adapters/google";
 export { createOpenAIChatAdapter } from "./adapters/openai-chat";
 export { createResponsesPassthroughAdapter } from "./adapters/openai-responses";
 export { loadConfig, saveConfig } from "./config";

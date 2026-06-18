@@ -1,0 +1,183 @@
+import type { ProviderAdapter } from "./base";
+import type {
+  AdapterEvent,
+  OcxAssistantMessage,
+  OcxParsedRequest,
+  OcxProviderConfig,
+  OcxTextContent,
+  OcxToolCall,
+} from "../types";
+
+function messagesToGeminiFormat(parsed: OcxParsedRequest): { systemInstruction?: unknown; contents: unknown[] } {
+  const systemInstruction = parsed.context.systemPrompt?.length
+    ? { parts: [{ text: parsed.context.systemPrompt.join("\n\n") }] }
+    : undefined;
+
+  const contents: unknown[] = [];
+
+  for (const msg of parsed.context.messages) {
+    switch (msg.role) {
+      case "user":
+      case "developer": {
+        const text = typeof msg.content === "string"
+          ? msg.content
+          : (msg.content as OcxTextContent[]).map(p => p.text).join("");
+        contents.push({ role: "user", parts: [{ text }] });
+        break;
+      }
+      case "assistant": {
+        const aMsg = msg as OcxAssistantMessage;
+        const parts: unknown[] = [];
+        for (const p of aMsg.content) {
+          if (p.type === "text") parts.push({ text: (p as OcxTextContent).text });
+          else if (p.type === "toolCall") {
+            const tc = p as OcxToolCall;
+            parts.push({ functionCall: { name: tc.name, args: tc.arguments } });
+          }
+        }
+        contents.push({ role: "model", parts });
+        break;
+      }
+      case "toolResult": {
+        contents.push({
+          role: "user",
+          parts: [{ functionResponse: { name: msg.toolName, response: { result: msg.content } } }],
+        });
+        break;
+      }
+    }
+  }
+
+  return { systemInstruction, contents };
+}
+
+function toolsToGeminiFormat(parsed: OcxParsedRequest): unknown[] | undefined {
+  if (!parsed.context.tools?.length) return undefined;
+  return [{
+    functionDeclarations: parsed.context.tools.map(t => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+    })),
+  }];
+}
+
+export function createGoogleAdapter(provider: OcxProviderConfig): ProviderAdapter {
+  return {
+    name: "google",
+
+    buildRequest(parsed: OcxParsedRequest) {
+      const { systemInstruction, contents } = messagesToGeminiFormat(parsed);
+      const tools = toolsToGeminiFormat(parsed);
+
+      const body: Record<string, unknown> = { contents };
+      if (systemInstruction) body.systemInstruction = systemInstruction;
+      if (tools) body.tools = tools;
+
+      const generationConfig: Record<string, unknown> = {};
+      if (parsed.options.maxOutputTokens) generationConfig.maxOutputTokens = parsed.options.maxOutputTokens;
+      if (parsed.options.temperature !== undefined) generationConfig.temperature = parsed.options.temperature;
+      if (parsed.options.topP !== undefined) generationConfig.topP = parsed.options.topP;
+      if (parsed.options.stopSequences) generationConfig.stopSequences = parsed.options.stopSequences;
+      if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
+
+      const method = parsed.stream ? "streamGenerateContent" : "generateContent";
+      const streamParam = parsed.stream ? "?alt=sse" : "";
+      const url = `${provider.baseUrl}/v1beta/models/${parsed.modelId}:${method}${streamParam}`;
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (provider.apiKey) headers["x-goog-api-key"] = provider.apiKey;
+      if (provider.headers) Object.assign(headers, provider.headers);
+
+      return { url, method: "POST", headers, body: JSON.stringify(body) };
+    },
+
+    async *parseStream(response: Response): AsyncGenerator<AdapterEvent> {
+      if (!response.body) {
+        yield { type: "error", message: "No response body" };
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const payload = line.slice(6).trim();
+            if (!payload) continue;
+
+            let chunk: Record<string, unknown>;
+            try { chunk = JSON.parse(payload); } catch { continue; }
+
+            const candidates = chunk.candidates as { content?: { parts?: unknown[] }; finishReason?: string }[] | undefined;
+            if (!candidates?.length) continue;
+
+            const parts = candidates[0].content?.parts as { text?: string; functionCall?: { name: string; args: unknown } }[] | undefined;
+            if (parts) {
+              for (const part of parts) {
+                if (part.text) {
+                  yield { type: "text_delta", text: part.text };
+                }
+                if (part.functionCall) {
+                  const id = `call_${crypto.randomUUID().slice(0, 8)}`;
+                  yield { type: "tool_call_start", id, name: part.functionCall.name };
+                  yield { type: "tool_call_delta", arguments: JSON.stringify(part.functionCall.args ?? {}) };
+                  yield { type: "tool_call_end" };
+                }
+              }
+            }
+
+            const usageMeta = chunk.usageMetadata as Record<string, number> | undefined;
+            if (candidates[0].finishReason && usageMeta) {
+              yield {
+                type: "done",
+                usage: {
+                  inputTokens: usageMeta.promptTokenCount ?? 0,
+                  outputTokens: usageMeta.candidatesTokenCount ?? 0,
+                },
+              };
+            }
+          }
+        }
+        yield { type: "done" };
+      } finally {
+        reader.releaseLock();
+      }
+    },
+
+    async parseResponse(response: Response): Promise<AdapterEvent[]> {
+      const json = await response.json() as Record<string, unknown>;
+      const events: AdapterEvent[] = [];
+
+      const candidates = json.candidates as { content?: { parts?: { text?: string; functionCall?: { name: string; args: unknown } }[] } }[] | undefined;
+      if (candidates?.[0]?.content?.parts) {
+        for (const part of candidates[0].content.parts) {
+          if (part.text) events.push({ type: "text_delta", text: part.text });
+          if (part.functionCall) {
+            const id = `call_${crypto.randomUUID().slice(0, 8)}`;
+            events.push({ type: "tool_call_start", id, name: part.functionCall.name });
+            events.push({ type: "tool_call_delta", arguments: JSON.stringify(part.functionCall.args ?? {}) });
+            events.push({ type: "tool_call_end" });
+          }
+        }
+      }
+
+      const usage = json.usageMetadata as Record<string, number> | undefined;
+      events.push({
+        type: "done",
+        usage: usage ? { inputTokens: usage.promptTokenCount ?? 0, outputTokens: usage.candidatesTokenCount ?? 0 } : undefined,
+      });
+      return events;
+    },
+  };
+}

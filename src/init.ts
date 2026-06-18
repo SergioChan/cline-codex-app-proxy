@@ -44,6 +44,18 @@ const PRESETS: Record<string, { adapter: string; baseUrl: string; envKey: string
     envKey: "GROQ_API_KEY",
     models: ["llama-4-scout-17b", "llama-4-maverick-17b"],
   },
+  "google": {
+    adapter: "google",
+    baseUrl: "https://generativelanguage.googleapis.com",
+    envKey: "GOOGLE_API_KEY",
+    models: ["gemini-3-pro", "gemini-3-flash"],
+  },
+  "azure-openai": {
+    adapter: "azure-openai",
+    baseUrl: "https://{your-resource}.openai.azure.com/openai/deployments/{deployment}",
+    envKey: "AZURE_OPENAI_API_KEY",
+    models: ["gpt-5.5"],
+  },
 };
 
 export async function runInit(): Promise<void> {
