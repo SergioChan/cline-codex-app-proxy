@@ -2,8 +2,9 @@ import { createAnthropicAdapter } from "./adapters/anthropic";
 import { createOpenAIChatAdapter } from "./adapters/openai-chat";
 import { createResponsesPassthroughAdapter } from "./adapters/openai-responses";
 import { bridgeToResponsesSSE, buildResponseJSON, formatErrorResponse } from "./bridge";
-import { loadConfig, resolveEnvValue } from "./config";
+import { loadConfig } from "./config";
 import { parseRequest } from "./responses/parser";
+import { routeModel } from "./router";
 import type { OcxConfig, OcxProviderConfig } from "./types";
 
 const VERSION = "0.0.1";
@@ -21,19 +22,6 @@ function resolveAdapter(providerConfig: OcxProviderConfig) {
   }
 }
 
-function resolveProvider(config: OcxConfig, modelId: string): { provider: OcxProviderConfig; resolvedModelId: string } {
-  for (const [, prov] of Object.entries(config.providers)) {
-    if (prov.defaultModel === modelId) {
-      return { provider: { ...prov, apiKey: resolveEnvValue(prov.apiKey) }, resolvedModelId: modelId };
-    }
-  }
-  const defaultProv = config.providers[config.defaultProvider];
-  if (defaultProv) {
-    return { provider: { ...defaultProv, apiKey: resolveEnvValue(defaultProv.apiKey) }, resolvedModelId: modelId };
-  }
-  throw new Error(`No provider configured for model: ${modelId}`);
-}
-
 async function handleResponses(req: Request, config: OcxConfig): Promise<Response> {
   let body: unknown;
   try {
@@ -49,14 +37,14 @@ async function handleResponses(req: Request, config: OcxConfig): Promise<Respons
     return formatErrorResponse(400, "invalid_request_error", err instanceof Error ? err.message : String(err));
   }
 
-  let providerInfo;
+  let route;
   try {
-    providerInfo = resolveProvider(config, parsed.modelId);
+    route = routeModel(config, parsed.modelId);
   } catch (err) {
     return formatErrorResponse(404, "invalid_request_error", err instanceof Error ? err.message : String(err));
   }
 
-  const adapter = resolveAdapter(providerInfo.provider);
+  const adapter = resolveAdapter(route.provider);
 
   if ("passthrough" in adapter && adapter.passthrough) {
     const request = adapter.buildRequest(parsed);

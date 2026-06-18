@@ -115,5 +115,6 @@ export interface OcxProviderConfig {
   baseUrl: string;
   apiKey?: string;
   defaultModel?: string;
+  models?: string[];
   headers?: Record<string, string>;
 }
