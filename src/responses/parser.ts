@@ -251,5 +251,5 @@ export function parseRequest(body: unknown): OcxParsedRequest {
   if (data.presence_penalty !== undefined) options.presencePenalty = data.presence_penalty;
   if (data.frequency_penalty !== undefined) options.frequencyPenalty = data.frequency_penalty;
 
-  return { modelId: data.model, context, stream: data.stream === true, options };
+  return { modelId: data.model, context, stream: data.stream === true, options, _rawBody: body };
 }

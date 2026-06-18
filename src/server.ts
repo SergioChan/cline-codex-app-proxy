@@ -1,4 +1,6 @@
+import { createAnthropicAdapter } from "./adapters/anthropic";
 import { createOpenAIChatAdapter } from "./adapters/openai-chat";
+import { createResponsesPassthroughAdapter } from "./adapters/openai-responses";
 import { bridgeToResponsesSSE, buildResponseJSON, formatErrorResponse } from "./bridge";
 import { loadConfig, resolveEnvValue } from "./config";
 import { parseRequest } from "./responses/parser";
@@ -10,6 +12,10 @@ function resolveAdapter(providerConfig: OcxProviderConfig) {
   switch (providerConfig.adapter) {
     case "openai-chat":
       return createOpenAIChatAdapter(providerConfig);
+    case "anthropic":
+      return createAnthropicAdapter(providerConfig);
+    case "openai-responses":
+      return createResponsesPassthroughAdapter(providerConfig);
     default:
       throw new Error(`Unknown adapter: ${providerConfig.adapter}`);
   }
@@ -51,6 +57,25 @@ async function handleResponses(req: Request, config: OcxConfig): Promise<Respons
   }
 
   const adapter = resolveAdapter(providerInfo.provider);
+
+  if ("passthrough" in adapter && adapter.passthrough) {
+    const request = adapter.buildRequest(parsed);
+    let upstreamResponse: Response;
+    try {
+      upstreamResponse = await fetch(request.url, {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
+      });
+    } catch (err) {
+      return formatErrorResponse(502, "upstream_error", `Provider unreachable: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return new Response(upstreamResponse.body, {
+      status: upstreamResponse.status,
+      headers: upstreamResponse.headers,
+    });
+  }
+
   const request = adapter.buildRequest(parsed);
 
   let upstreamResponse: Response;

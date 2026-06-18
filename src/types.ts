@@ -3,6 +3,7 @@ export interface OcxParsedRequest {
   context: OcxContext;
   stream: boolean;
   options: OcxRequestOptions;
+  _rawBody?: unknown;
 }
 
 export interface OcxContext {

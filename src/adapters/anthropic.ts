@@ -1,0 +1,237 @@
+import type { ProviderAdapter } from "./base";
+import type {
+  AdapterEvent,
+  OcxAssistantMessage,
+  OcxMessage,
+  OcxParsedRequest,
+  OcxProviderConfig,
+  OcxTextContent,
+  OcxThinkingContent,
+  OcxToolCall,
+} from "../types";
+
+function messagesToAnthropicFormat(parsed: OcxParsedRequest): { system: string | undefined; messages: unknown[] } {
+  const system = parsed.context.systemPrompt?.join("\n\n") || undefined;
+  const messages: unknown[] = [];
+
+  for (const msg of parsed.context.messages) {
+    switch (msg.role) {
+      case "user":
+      case "developer": {
+        const content = typeof msg.content === "string"
+          ? msg.content
+          : (msg.content as OcxTextContent[]).map(p => ({ type: "text", text: p.text }));
+        messages.push({ role: "user", content });
+        break;
+      }
+      case "assistant": {
+        const aMsg = msg as OcxAssistantMessage;
+        const content: unknown[] = [];
+        for (const part of aMsg.content) {
+          if (part.type === "text") {
+            content.push({ type: "text", text: (part as OcxTextContent).text });
+          } else if (part.type === "thinking") {
+            const t = part as OcxThinkingContent;
+            content.push({ type: "thinking", thinking: t.thinking, ...(t.signature ? { signature: t.signature } : {}) });
+          } else if (part.type === "toolCall") {
+            const tc = part as OcxToolCall;
+            content.push({ type: "tool_use", id: tc.id, name: tc.name, input: tc.arguments });
+          }
+        }
+        messages.push({ role: "assistant", content });
+        break;
+      }
+      case "toolResult": {
+        messages.push({
+          role: "user",
+          content: [{
+            type: "tool_result",
+            tool_use_id: msg.toolCallId,
+            content: msg.content,
+          }],
+        });
+        break;
+      }
+    }
+  }
+
+  return { system, messages };
+}
+
+function toolsToAnthropicFormat(parsed: OcxParsedRequest): unknown[] | undefined {
+  if (!parsed.context.tools || parsed.context.tools.length === 0) return undefined;
+  return parsed.context.tools.map(t => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.parameters,
+  }));
+}
+
+export function createAnthropicAdapter(provider: OcxProviderConfig): ProviderAdapter {
+  return {
+    name: "anthropic",
+
+    buildRequest(parsed: OcxParsedRequest) {
+      const { system, messages } = messagesToAnthropicFormat(parsed);
+      const tools = toolsToAnthropicFormat(parsed);
+
+      const body: Record<string, unknown> = {
+        model: parsed.modelId,
+        messages,
+        stream: parsed.stream,
+        max_tokens: parsed.options.maxOutputTokens ?? 8192,
+      };
+      if (system) body.system = system;
+      if (tools) body.tools = tools;
+      if (parsed.options.temperature !== undefined) body.temperature = parsed.options.temperature;
+      if (parsed.options.topP !== undefined) body.top_p = parsed.options.topP;
+      if (parsed.options.stopSequences) body.stop_sequences = parsed.options.stopSequences;
+
+      if (parsed.options.reasoning) {
+        body.thinking = { type: "enabled", budget_tokens: parsed.options.maxOutputTokens ?? 8192 };
+      }
+
+      if (parsed.options.toolChoice) {
+        const tc = parsed.options.toolChoice;
+        if (tc === "auto") body.tool_choice = { type: "auto" };
+        else if (tc === "none") body.tool_choice = { type: "none" };
+        else if (tc === "required") body.tool_choice = { type: "any" };
+        else if (typeof tc === "object" && "name" in tc) body.tool_choice = { type: "tool", name: tc.name };
+      }
+
+      const url = `${provider.baseUrl}/v1/messages`;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+      };
+      if (provider.apiKey) headers["x-api-key"] = provider.apiKey;
+      if (provider.headers) Object.assign(headers, provider.headers);
+
+      return { url, method: "POST", headers, body: JSON.stringify(body) };
+    },
+
+    async *parseStream(response: Response): AsyncGenerator<AdapterEvent> {
+      if (!response.body) {
+        yield { type: "error", message: "No response body" };
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let currentBlockType = "";
+      let currentToolCallId = "";
+      let currentToolCallName = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          let currentEventType = "";
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              currentEventType = line.slice(7).trim();
+              continue;
+            }
+            if (!line.startsWith("data: ")) continue;
+            const payload = line.slice(6).trim();
+            if (!payload) continue;
+
+            let data: Record<string, unknown>;
+            try {
+              data = JSON.parse(payload) as Record<string, unknown>;
+            } catch {
+              continue;
+            }
+
+            switch (currentEventType || data.type) {
+              case "content_block_start": {
+                const block = data.content_block as { type: string; id?: string; name?: string } | undefined;
+                if (!block) break;
+                currentBlockType = block.type;
+                if (block.type === "tool_use") {
+                  currentToolCallId = block.id ?? "";
+                  currentToolCallName = block.name ?? "";
+                  yield { type: "tool_call_start", id: currentToolCallId, name: currentToolCallName };
+                }
+                break;
+              }
+              case "content_block_delta": {
+                const delta = data.delta as Record<string, unknown> | undefined;
+                if (!delta) break;
+                if (delta.type === "text_delta" && typeof delta.text === "string") {
+                  yield { type: "text_delta", text: delta.text };
+                } else if (delta.type === "thinking_delta" && typeof delta.thinking === "string") {
+                  yield { type: "thinking_delta", thinking: delta.thinking };
+                } else if (delta.type === "input_json_delta" && typeof delta.partial_json === "string") {
+                  yield { type: "tool_call_delta", arguments: delta.partial_json };
+                }
+                break;
+              }
+              case "content_block_stop": {
+                if (currentBlockType === "tool_use") {
+                  yield { type: "tool_call_end" };
+                  currentToolCallId = "";
+                  currentBlockType = "";
+                }
+                break;
+              }
+              case "message_delta": {
+                const usage = data.usage as Record<string, number> | undefined;
+                if (usage) {
+                  yield {
+                    type: "done",
+                    usage: {
+                      inputTokens: usage.input_tokens ?? 0,
+                      outputTokens: usage.output_tokens ?? 0,
+                    },
+                  };
+                }
+                break;
+              }
+              case "message_stop": {
+                break;
+              }
+              case "error": {
+                const err = data.error as { message?: string } | undefined;
+                yield { type: "error", message: err?.message ?? "Anthropic error" };
+                return;
+              }
+            }
+            currentEventType = "";
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    },
+
+    async parseResponse(response: Response): Promise<AdapterEvent[]> {
+      const json = await response.json() as Record<string, unknown>;
+      const events: AdapterEvent[] = [];
+      const content = json.content as { type: string; text?: string; id?: string; name?: string; input?: unknown }[] | undefined;
+      if (content) {
+        for (const block of content) {
+          if (block.type === "text" && block.text) {
+            events.push({ type: "text_delta", text: block.text });
+          } else if (block.type === "tool_use") {
+            events.push({ type: "tool_call_start", id: block.id ?? "", name: block.name ?? "" });
+            events.push({ type: "tool_call_delta", arguments: JSON.stringify(block.input ?? {}) });
+            events.push({ type: "tool_call_end" });
+          }
+        }
+      }
+      const usage = json.usage as Record<string, number> | undefined;
+      events.push({
+        type: "done",
+        usage: usage ? { inputTokens: usage.input_tokens ?? 0, outputTokens: usage.output_tokens ?? 0 } : undefined,
+      });
+      return events;
+    },
+  };
+}
