@@ -11,18 +11,63 @@ const CODEX_PROFILE_PATH = join(CODEX_HOME, "opencodex.config.toml");
 
 const OCX_SECTION_MARKER = "# Auto-injected by opencodex";
 
-function buildProviderBlock(port: number): string {
+/**
+ * The `[model_providers.opencodex]` TABLE only. A table is position-independent in TOML, so it is
+ * safe to append at EOF. The bare root key `model_provider = "opencodex"` is NOT included here —
+ * it must live at the document root (before any table header) and is set separately by
+ * setRootModelProvider(). Appending the bare key at EOF was the original bug: it nested under
+ * whatever `[table]` happened to be open last (e.g. `[plugins."chrome@openai-bundled"]`), so Codex
+ * never saw a global model_provider and silently fell back to the `openai` (ChatGPT) provider.
+ */
+function buildProviderTableBlock(port: number): string {
   const lines = [
     "",
     OCX_SECTION_MARKER,
-    'model_provider = "opencodex"',
-    "",
     "[model_providers.opencodex]",
     'name = "OpenCodex Proxy"',
     `base_url = "http://localhost:${port}/v1"`,
     'wire_api = "responses"',
   ];
   return lines.join("\n") + "\n";
+}
+
+/**
+ * Strip every existing `model_provider` line that we must not duplicate: any line set to
+ * "opencodex" (wherever it sits — including a previously mis-nested one under a table), plus any
+ * ROOT-level model_provider (before the first table) of any value, since we override the global.
+ * A `model_provider` legitimately inside a user table/profile with a non-opencodex value is left
+ * untouched.
+ */
+function stripExistingModelProvider(content: string): string {
+  const lines = content.split("\n");
+  const firstTable = lines.findIndex(l => /^\s*\[/.test(l));
+  const out: string[] = [];
+  lines.forEach((line, i) => {
+    if (/^\s*model_provider\s*=/.test(line)) {
+      const isOurs = /^\s*model_provider\s*=\s*"opencodex"\s*$/.test(line);
+      const isRoot = firstTable === -1 || i < firstTable;
+      if (isOurs || isRoot) return; // drop it
+    }
+    out.push(line);
+  });
+  return out.join("\n");
+}
+
+/**
+ * Insert `model_provider = "opencodex"` at the document ROOT — immediately before the first table
+ * header (TOML root keys must precede all tables). If there are no tables, append it to the root body.
+ */
+function setRootModelProvider(content: string): string {
+  const lines = content.split("\n");
+  const firstTable = lines.findIndex(l => /^\s*\[/.test(l));
+  const key = 'model_provider = "opencodex"';
+  if (firstTable === -1) {
+    return content.replace(/\n+$/, "") + "\n" + key + "\n";
+  }
+  let insertAt = firstTable;
+  while (insertAt > 0 && lines[insertAt - 1].trim() === "") insertAt--;
+  lines.splice(insertAt, 0, key);
+  return lines.join("\n");
 }
 
 function buildProfileFile(port: number): string {
@@ -41,12 +86,18 @@ export async function injectCodexConfig(port: number, _config?: OcxConfig): Prom
 
   let content = readFileSync(CODEX_CONFIG_PATH, "utf-8");
 
+  // Idempotent clean-up of any prior injection: drop the provider table (marker-based) and every
+  // stray/mis-nested model_provider line, so re-injecting can't duplicate keys or leave the buggy
+  // table-nested key behind.
   if (content.includes("[model_providers.opencodex]")) {
     content = removeOcxSection(content);
   }
+  content = stripExistingModelProvider(content);
 
-  const block = buildProviderBlock(port);
-  content = content.trimEnd() + "\n" + block;
+  // 1) Root key BEFORE the first table header (must be a global, not nested under a table).
+  content = setRootModelProvider(content);
+  // 2) Provider table appended at EOF (position-independent).
+  content = content.trimEnd() + "\n" + buildProviderTableBlock(port);
 
   writeFileSync(CODEX_CONFIG_PATH, content, "utf-8");
   writeFileSync(CODEX_PROFILE_PATH, buildProfileFile(port), "utf-8");
