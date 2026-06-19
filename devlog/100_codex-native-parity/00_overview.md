@@ -10,7 +10,8 @@ parity pass: audit every Codex-native catalog/runtime selector that opencodex cu
 inherits from a template, then decide which fields should be preserved, rewritten, or stripped
 for routed non-OpenAI models.
 
-This is planning only. No runtime code is changed in this phase log.
+This started as planning-only research. Implementation now proceeds in independent PABCD slices,
+with each slice recorded in this devlog and committed separately.
 
 ## Research Split
 
@@ -20,6 +21,8 @@ The investigation was split lexicographically by decade:
 | --- | --- |
 | `10_search-and-tool-discovery.md` | `supports_search_tool`, `web_search_tool_type`, hosted vs deferred search fallback |
 | `11_search-defaults-and-inherited-state.md` | Native Codex search defaults and current opencodex inherited catalog state |
+| `12_catalog-normalization-implementation-plan.md` | Phase 100.1 implementation plan for routed catalog selector normalization |
+| `13_catalog-normalization-completion.md` | Phase 100.1 completion evidence and verification record |
 | `20_personality-model-messages.md` | `model_messages`, `supports_personality`, prompt identity/personality support |
 | `21_model-messages-strip-first.md` | Follow-up decision: strip `model_messages` from routed models first |
 | `30_tool-mode-multi-agent.md` | `tool_mode`, `multi_agent_version`, code-mode and subagent selector behavior |

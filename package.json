@@ -21,6 +21,7 @@
   "scripts": {
     "dev": "bun run src/cli.ts start",
     "start": "bun run src/cli.ts start",
+    "test": "bun test tests",
     "typecheck": "bun x tsc --noEmit",
     "build:gui": "cd gui && bun install && bun run build",
     "postinstall": "node scripts/postinstall.mjs",

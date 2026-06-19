@@ -69,6 +69,19 @@ function normalizeServiceTiers(entry: RawEntry): RawEntry {
   return entry;
 }
 
+export function normalizeRoutedCatalogEntry(entry: RawEntry): RawEntry {
+  delete entry.model_messages;
+  delete entry.tool_mode;
+  delete entry.multi_agent_version;
+  delete entry.use_responses_lite;
+  delete entry.supports_websockets;
+  delete entry.additional_speed_tiers;
+  delete entry.service_tier;
+  delete entry.service_tiers;
+  delete entry.default_service_tier;
+  return entry;
+}
+
 function loadCatalogForSync(path: string): { models?: RawEntry[]; [k: string]: unknown } | null {
   const catalog = readCatalog(path);
   if (catalog) return catalog;
@@ -132,10 +145,7 @@ function deriveEntry(template: RawEntry | null, slug: string, desc: string, prio
       );
       e.supported_reasoning_levels = ROUTED_REASONING_LEVELS.map(l => byEffort.get(l.effort) ?? { ...l });
       e.default_reasoning_level = "medium";
-      delete e.additional_speed_tiers;
-      delete e.service_tier;
-      delete e.service_tiers;
-      delete e.default_service_tier;
+      normalizeRoutedCatalogEntry(e);
     }
     return normalizeServiceTiers(e);
   }
