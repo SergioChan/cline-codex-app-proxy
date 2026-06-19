@@ -328,13 +328,12 @@ export function restoreCodexCatalog(): { removed: number; kept: number; path: st
 }
 
 /**
- * Delete Codex's models cache (~/.codex/models_cache.json) so the next turn re-fetches /v1/models.
+ * Delete Codex's models cache ($CODEX_HOME/models_cache.json) so the next turn re-fetches /v1/models.
  * Codex caches the model list for 5 min (DEFAULT_MODEL_CACHE_TTL); invalidating makes catalog edits
  * (enable/disable, subagent reorder) apply on the next turn instead of waiting for the TTL.
  */
 export function invalidateCodexModelsCache(): void {
   try {
-    const p = join(homedir(), ".codex", "models_cache.json");
-    if (existsSync(p)) unlinkSync(p);
+    if (existsSync(CODEX_MODELS_CACHE_PATH)) unlinkSync(CODEX_MODELS_CACHE_PATH);
   } catch { /* best-effort */ }
 }

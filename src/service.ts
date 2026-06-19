@@ -28,10 +28,21 @@ function logPath(): string {
   return join(getConfigDir(), "service.log");
 }
 
+function plistString(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 export function buildPlist(): string {
   const { bun, cli } = cliEntry();
   const log = logPath();
   const path = process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin";
+  const codexHome = process.env.CODEX_HOME?.trim();
+  const codexHomeXml = codexHome ? `    <key>CODEX_HOME</key><string>${plistString(codexHome)}</string>` : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -39,8 +50,8 @@ export function buildPlist(): string {
   <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${bun}</string>
-    <string>${cli}</string>
+    <string>${plistString(bun)}</string>
+    <string>${plistString(cli)}</string>
     <string>start</string>
   </array>
   <key>RunAtLoad</key><true/>
@@ -48,13 +59,26 @@ export function buildPlist(): string {
   <key>EnvironmentVariables</key>
   <dict>
     <key>OCX_SERVICE</key><string>1</string>
-    <key>PATH</key><string>${path}</string>
-  </dict>
-  <key>StandardOutPath</key><string>${log}</string>
-  <key>StandardErrorPath</key><string>${log}</string>
+    <key>PATH</key><string>${plistString(path)}</string>
+${codexHomeXml ? `${codexHomeXml}\n` : ""}  </dict>
+  <key>StandardOutPath</key><string>${plistString(log)}</string>
+  <key>StandardErrorPath</key><string>${plistString(log)}</string>
 </dict>
 </plist>
 `;
+}
+
+function systemdQuote(value: string): string {
+  return `"${value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, "\\\"")
+    .replace(/%/g, "%%")
+    .replace(/\n/g, "\\n")}"`;
+}
+
+function systemdEnvironmentAssignment(name: string, value: string | undefined): string | null {
+  if (!value) return null;
+  return `Environment=${systemdQuote(`${name}=${value}`)}`;
 }
 
 function sh(cmd: string): string {
@@ -104,6 +128,12 @@ export function buildUnit(): string {
   const { bun, cli } = cliEntry();
   const log = logPath();
   const path = process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin";
+  const codexHome = systemdEnvironmentAssignment("CODEX_HOME", process.env.CODEX_HOME?.trim());
+  const envLines = [
+    systemdEnvironmentAssignment("OCX_SERVICE", "1"),
+    systemdEnvironmentAssignment("PATH", path),
+    codexHome,
+  ].filter((line): line is string => Boolean(line)).join("\n");
   return `[Unit]
 Description=OpenCodex Proxy Server
 After=network-online.target
@@ -111,13 +141,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=${bun} ${cli} start
+ExecStart=${systemdQuote(bun)} ${systemdQuote(cli)} start
 Restart=on-failure
 RestartSec=5
-Environment=OCX_SERVICE=1
-Environment=PATH=${path}
-StandardOutput=append:${log}
-StandardError=append:${log}
+${envLines}
+StandardOutput=${systemdQuote(`append:${log}`)}
+StandardError=${systemdQuote(`append:${log}`)}
 
 [Install]
 WantedBy=default.target
