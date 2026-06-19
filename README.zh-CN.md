@@ -77,7 +77,7 @@ codex -m "ollama-cloud/glm-5.2"      "Write a SQL migration"
 - **OAuth、API key 或 ChatGPT 转发（forward）。** 用你的 xAI / Anthropic / Kimi 账户登录（token
   自动刷新）、转发你的 `codex login`，或直接粘贴一个 key（支持 `${ENV_VARS}`）。内置一份 18 家 provider 的
   API-key 目录（含 **Ollama Cloud**）。
-- **无缝接入 Codex。** 向 `~/.codex/config.toml` 注入一个 `[model_providers.opencodex]` 表，并
+- **无缝接入 Codex。** 向 `$CODEX_HOME/config.toml`（默认 `~/.codex/config.toml`）注入一个 `[model_providers.opencodex]` 表，并
   将已路由的模型合并进 Codex 的目录和 subagent 选择器 —— 完全可逆。
 - **Sidecars。** 通过基于你 ChatGPT 登录的 `gpt-5.4-mini`，为非 OpenAI 模型提供真正的**网页搜索**和**图像理解**能力。
 - **Web 仪表盘**，用于管理 provider、OAuth 登录、模型选择和请求日志。

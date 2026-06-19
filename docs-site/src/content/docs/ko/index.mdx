@@ -42,7 +42,7 @@ Codex CLI / App / SDK ──/v1/responses──▶ opencodex ──▶ Any provi
     포워딩하거나, API 키를 붙여넣으세요. 키는 `${ENV_VARS}`로 지정할 수 있습니다.
   </Card>
   <Card title="Codex에 바로 연결" icon="rocket">
-    `ocx init`은 프로바이더를 `~/.codex/config.toml`에 주입하고, 라우팅된 모델을 Codex의
+    `ocx init`은 프로바이더를 `$CODEX_HOME/config.toml`(기본값 `~/.codex/config.toml`)에 주입하고, 라우팅된 모델을 Codex의
     카탈로그와 subagent 선택기에 병합합니다. `ocx stop`은 네이티브 Codex를 깔끔하게 복원합니다.
   </Card>
   <Card title="Sidecar" icon="magnifier">

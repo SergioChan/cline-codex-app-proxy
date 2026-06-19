@@ -11,7 +11,7 @@ provider 之外,绝不会把你的流量发送到任何地方。
 | 要求 | 原因 |
 | --- | --- |
 | **[Bun](https://bun.sh) ≥ 1.1**(推荐)或 **Node ≥ 20** | `ocx` 运行在 Bun 运行时上;服务运行器会调用 `bun`。 |
-| **[OpenAI Codex](https://openai.com/codex)**(CLI、App 或 SDK) | opencodex 所代理的客户端。opencodex 会写入 `~/.codex/config.toml`。 |
+| **[OpenAI Codex](https://openai.com/codex)**(CLI、App 或 SDK) | opencodex 所代理的客户端。opencodex 会写入 `$CODEX_HOME/config.toml`（默认 `~/.codex/config.toml`）。 |
 | 一个 provider 账号或 API key | Anthropic、xAI、Kimi、Ollama Cloud、OpenRouter、一个 OpenAI 兼容端点,或你的 ChatGPT 登录凭据。 |
 
 ## 安装
@@ -55,7 +55,7 @@ cd gui && bun install && bun dev
 | `~/.opencodex/ocx.pid` | 正在运行的代理的 PID(单实例保护)。 |
 | `~/.opencodex/auth.json` | 已存储的 OAuth 凭据(当你执行 `ocx login` 时)。 |
 | `~/.opencodex/catalog-backup.json` | 原始的 Codex 模型目录,在任何编辑前备份。 |
-| `~/.codex/config.toml` | 在 `ocx init` 时,opencodex 会在此追加一个 `[model_providers.opencodex]` 表。 |
+| `$CODEX_HOME/config.toml` | 在 `ocx init` 时,opencodex 会在此追加一个 `[model_providers.opencodex]` 表（默认 `~/.codex/config.toml`）。 |
 
 :::note
 opencodex 绝不会删除你的 Codex 配置。每次注入都是可逆的 —— `ocx stop`、`ocx restore`

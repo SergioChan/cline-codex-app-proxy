@@ -3,7 +3,7 @@ title: Codex 통합
 description: opencodex가 Codex에 자신을 주입하고, 모델 카탈로그를 동기화하고, 서브에이전트 선택기를 구동하며, 깔끔하게 복원하는 방식.
 ---
 
-opencodex는 Codex가 읽는 두 가지, 즉 설정(`~/.codex/config.toml`)과 모델 카탈로그를 편집하여 Codex가
+opencodex는 Codex가 읽는 두 가지, 즉 설정(`$CODEX_HOME/config.toml`, 기본값 `~/.codex/config.toml`)과 모델 카탈로그를 편집하여 Codex가
 프록시를 경유하도록 만듭니다. 모든 편집은 멱등적이며 되돌릴 수 있습니다.
 
 ## 설정 주입
@@ -21,7 +21,7 @@ base_url = "http://localhost:10100/v1"
 wire_api = "responses"
 ```
 
-또한 `~/.codex/opencodex.config.toml`에 선택적 프로파일을 작성하여 명시적으로 옵트인할 수 있게 합니다:
+또한 `$CODEX_HOME/opencodex.config.toml`에 선택적 프로파일을 작성하여 명시적으로 옵트인할 수 있게 합니다:
 
 ```bash
 codex --profile opencodex "…"
@@ -35,7 +35,7 @@ codex --profile opencodex "…"
 
 ## 모델 카탈로그 동기화
 
-Codex는 디스크의 카탈로그(기본값 `~/.codex/opencodex-catalog.json`)에 있는 모델을 표시합니다. 시작 시와
+Codex는 디스크의 카탈로그(기본값 `$CODEX_HOME/opencodex-catalog.json`)에 있는 모델을 표시합니다. 시작 시와
 `ocx sync` 시, opencodex는:
 
 1. 원본 카탈로그를 `~/.opencodex/catalog-backup.json`에 한 번 **백업**합니다(featuring을 되돌릴 수 있도록).

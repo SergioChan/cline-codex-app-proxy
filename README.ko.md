@@ -77,7 +77,7 @@ codex -m "ollama-cloud/glm-5.2"      "Write a SQL migration"
 - **OAuth, API 키, 또는 ChatGPT forward.** xAI / Anthropic / Kimi 계정으로 로그인하거나(토큰은
   자동 갱신됩니다), `codex login`을 forward 하거나, 키를 붙여넣으세요(`${ENV_VARS}` 지원). 18개 프로바이더의
   API 키 카탈로그(**Ollama Cloud** 포함)가 기본 내장되어 있습니다.
-- **Codex에 바로 통합.** `~/.codex/config.toml`에 `[model_providers.opencodex]` 테이블을 주입하고
+- **Codex에 바로 통합.** `$CODEX_HOME/config.toml`(기본값 `~/.codex/config.toml`)에 `[model_providers.opencodex]` 테이블을 주입하고
   라우팅된 모델을 Codex의 카탈로그와 서브에이전트 선택기에 병합합니다 — 완전히 되돌릴 수 있습니다.
 - **Sidecar.** OpenAI가 아닌 모델에도 ChatGPT 로그인을 통한 `gpt-5.4-mini`를 사용해 실제 **웹 검색**과
   **이미지 이해** 기능을 제공합니다.

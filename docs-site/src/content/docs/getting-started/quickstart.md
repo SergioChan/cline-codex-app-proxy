@@ -19,7 +19,8 @@ ocx init
 3. **Default model** — the model used when a request doesn't match another provider.
 4. **Proxy port** — defaults to `10100`.
 5. **Inject into Codex?** — when you accept, opencodex writes the `[model_providers.opencodex]` table
-   into `~/.codex/config.toml` and sets `model_provider = "opencodex"` so Codex routes through the proxy.
+   into `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`) and sets
+   `model_provider = "opencodex"` so Codex routes through the proxy.
 
 The result is saved to `~/.opencodex/config.json`.
 

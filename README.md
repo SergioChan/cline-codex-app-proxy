@@ -87,8 +87,9 @@ codex -m "ollama-cloud/glm-5.2"      "Write a SQL migration"
 - **OAuth, API key, or ChatGPT forward.** Log in with your xAI / Anthropic / Kimi account (tokens
   auto-refresh), forward your `codex login`, or paste a key (`${ENV_VARS}` supported). An 18-provider
   API-key catalog (incl. **Ollama Cloud**) is built in.
-- **Drops into Codex.** Injects a `[model_providers.opencodex]` table into `~/.codex/config.toml` and
-  merges routed models into Codex's catalog and subagent picker — fully reversible.
+- **Drops into Codex.** Injects a `[model_providers.opencodex]` table into
+  `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`) and merges routed models into Codex's
+  catalog and subagent picker — fully reversible.
 - **Sidecars.** Give non-OpenAI models real **web search** and **image understanding** via a
   `gpt-5.4-mini` over your ChatGPT login.
 - **Web dashboard** for providers, OAuth login, model selection, and request logs.

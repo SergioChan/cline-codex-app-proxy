@@ -11,7 +11,7 @@ opencodex의 CLI는 `ocx`입니다. 사용법을 보려면 `ocx help`(또는 `--
 
 대화형 설정 마법사입니다. 프로바이더(프리셋 또는 사용자 지정), API 키(직접 입력 또는 `${ENV}`),
 기본 모델, 프록시 포트를 입력받아 `~/.opencodex/config.json`을 저장하고, 선택적으로 프록시를
-`~/.codex/config.toml`에 주입합니다.
+`$CODEX_HOME/config.toml`(기본값 `~/.codex/config.toml`)에 주입합니다.
 
 ### `ocx start [--port <port>]`
 
@@ -70,8 +70,8 @@ ocx login xai
 
 ### `ocx service <subcommand>`
 
-opencodex를 로그인 시 관리되는 백그라운드 서비스(macOS **launchd**, Windows **Task Scheduler**)로
-실행합니다. 로그인 시 자동으로 시작되고 크래시 시 자동으로 재시작됩니다. 서비스 실행은
+opencodex를 로그인 시 관리되는 백그라운드 서비스(macOS **launchd**, Linux **systemd user unit**,
+Windows **Task Scheduler**)로 실행합니다. 로그인 시 자동으로 시작되고 크래시 시 자동으로 재시작됩니다. 서비스 실행은
 `OCX_SERVICE=1`을 설정하므로 재시작이 Codex 설정을 변경하지 않습니다.
 
 | Subcommand | Action |

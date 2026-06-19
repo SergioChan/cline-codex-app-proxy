@@ -281,10 +281,10 @@ Source:
 https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/schtasks-create
 
 Because Task Scheduler does not automatically encode opencodex-specific
-environment overrides into the command the way a shell session does, future
-hardening should consider whether Windows service install should also preserve
-`CODEX_HOME` explicitly. The immediate Windows model-list bug was fixed by
-making opencodex path resolution and catalog/profile writing match Codex.
+environment overrides into the command the way a shell session does, opencodex
+service install writes a small `.cmd` wrapper under `~/.opencodex/`. That wrapper
+sets `OCX_SERVICE=1`, preserves `PATH`, preserves `CODEX_HOME` when present, and
+then starts opencodex.
 
 ## Required opencodex behavior
 
@@ -376,9 +376,8 @@ definition should preserve that value:
 
 - Linux: add `Environment="CODEX_HOME=/some/path"` to the systemd user unit.
 - macOS: add `CODEX_HOME` under launchd `EnvironmentVariables`.
-- Windows: verify Task Scheduler command/environment behavior and prefer an
-  explicit wrapper/argument strategy if custom `CODEX_HOME` support is required
-  for service installs.
+- Windows: run Task Scheduler through an explicit `.cmd` wrapper that sets
+  `OCX_SERVICE=1` and preserves `CODEX_HOME` when present.
 
 ## Why macOS appeared fine
 

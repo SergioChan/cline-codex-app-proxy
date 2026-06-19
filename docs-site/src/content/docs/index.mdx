@@ -44,8 +44,9 @@ Codex CLI / App / SDK ──/v1/responses──▶ opencodex ──▶ Any provi
     login, or paste an API key. Keys can be `${ENV_VARS}`.
   </Card>
   <Card title="Drops into Codex" icon="rocket">
-    `ocx init` injects a provider into `~/.codex/config.toml` and merges routed models into Codex's
-    catalog and subagent picker. `ocx stop` restores native Codex cleanly.
+    `ocx init` injects a provider into `$CODEX_HOME/config.toml` (default
+    `~/.codex/config.toml`) and merges routed models into Codex's catalog and subagent picker.
+    `ocx stop` restores native Codex cleanly.
   </Card>
   <Card title="Sidecars" icon="magnifier">
     Give non-OpenAI models real **web search** and **image understanding** by routing those

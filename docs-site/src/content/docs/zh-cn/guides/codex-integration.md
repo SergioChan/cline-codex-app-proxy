@@ -3,7 +3,7 @@ title: Codex 集成
 description: opencodex 如何将自身注入 Codex、同步模型目录、驱动 subagent 选择器，并干净地恢复。
 ---
 
-opencodex 通过编辑 Codex 读取的两样东西，让 Codex 经由 proxy 路由：它的配置（`~/.codex/config.toml`）和它的模型目录。每一次编辑都是幂等且可逆的。
+opencodex 通过编辑 Codex 读取的两样东西，让 Codex 经由 proxy 路由：它的配置（`$CODEX_HOME/config.toml`，默认 `~/.codex/config.toml`）和它的模型目录。每一次编辑都是幂等且可逆的。
 
 ## 配置注入
 
@@ -20,7 +20,7 @@ base_url = "http://localhost:10100/v1"
 wire_api = "responses"
 ```
 
-它还会在 `~/.codex/opencodex.config.toml` 写入一个可选的 profile，以便你显式启用：
+它还会在 `$CODEX_HOME/opencodex.config.toml` 写入一个可选的 profile，以便你显式启用：
 
 ```bash
 codex --profile opencodex "…"
@@ -32,7 +32,7 @@ codex --profile opencodex "…"
 
 ## 模型目录同步
 
-Codex 显示的模型来自一个磁盘上的目录（默认为 `~/.codex/opencodex-catalog.json`）。在启动时以及执行 `ocx sync` 时，opencodex 会：
+Codex 显示的模型来自一个磁盘上的目录（默认为 `$CODEX_HOME/opencodex-catalog.json`）。在启动时以及执行 `ocx sync` 时，opencodex 会：
 
 1. **备份**一次原始目录到 `~/.opencodex/catalog-backup.json`（以便置顶操作可逆）。
 2. **获取**每个提供商的实时 `/models` 列表（缓存约 5 分钟；失败时回退到上一份正常列表，再回退到提供商已配置的 `models[]`）。

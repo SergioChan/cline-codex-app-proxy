@@ -42,7 +42,7 @@ Codex CLI / App / SDK ──/v1/responses──▶ opencodex ──▶ Any provi
     登录凭据,或粘贴一个 API key。Key 可以是 `${ENV_VARS}`。
   </Card>
   <Card title="无缝接入 Codex" icon="rocket">
-    `ocx init` 会向 `~/.codex/config.toml` 注入一个 provider,并将已路由的模型合并进 Codex 的
+    `ocx init` 会向 `$CODEX_HOME/config.toml`（默认 `~/.codex/config.toml`）注入一个 provider,并将已路由的模型合并进 Codex 的
     目录与 subagent 选择器。`ocx stop` 可干净地恢复原生 Codex。
   </Card>
   <Card title="Sidecar" icon="magnifier">

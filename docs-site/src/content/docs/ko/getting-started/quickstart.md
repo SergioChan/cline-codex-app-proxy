@@ -19,7 +19,7 @@ ocx init
 3. **기본 모델** — 요청이 다른 프로바이더와 매칭되지 않을 때 사용되는 모델입니다.
 4. **프록시 포트** — 기본값은 `10100`입니다.
 5. **Codex에 주입할까요?** — 동의하면 opencodex가 `[model_providers.opencodex]` 테이블을
-   `~/.codex/config.toml`에 기록하고, `model_provider = "opencodex"`로 설정해 Codex가 프록시를 통해 라우팅하도록 합니다.
+   `$CODEX_HOME/config.toml`(기본값 `~/.codex/config.toml`)에 기록하고, `model_provider = "opencodex"`로 설정해 Codex가 프록시를 통해 라우팅하도록 합니다.
 
 결과는 `~/.opencodex/config.json`에 저장됩니다.
 

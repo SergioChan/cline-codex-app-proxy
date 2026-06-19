@@ -19,7 +19,7 @@ ocx init
 3. **默认模型** —— 当某个请求未匹配到其他 provider 时所使用的模型。
 4. **代理端口** —— 默认为 `10100`。
 5. **注入到 Codex?** —— 当你接受时,opencodex 会将 `[model_providers.opencodex]` 表写入
-   `~/.codex/config.toml`,并设置 `model_provider = "opencodex"`,使 Codex 通过该代理进行路由。
+   `$CODEX_HOME/config.toml`（默认 `~/.codex/config.toml`）,并设置 `model_provider = "opencodex"`,使 Codex 通过该代理进行路由。
 
 结果会保存到 `~/.opencodex/config.json`。
 

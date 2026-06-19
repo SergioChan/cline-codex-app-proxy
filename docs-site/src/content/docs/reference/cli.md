@@ -11,7 +11,7 @@ The opencodex CLI is `ocx`. Run `ocx help` (or `--help` / `-h`) for usage.
 
 Interactive setup wizard. Prompts for a provider (preset or custom), API key (literal or `${ENV}`),
 default model, and proxy port; saves `~/.opencodex/config.json`; and optionally injects the proxy into
-`~/.codex/config.toml`.
+`$CODEX_HOME/config.toml` (default `~/.codex/config.toml`).
 
 ### `ocx start [--port <port>]`
 
@@ -70,9 +70,9 @@ the proxy if it isn't running.
 
 ### `ocx service <subcommand>`
 
-Run opencodex as a login-managed background service (macOS **launchd**, Windows **Task Scheduler**)
-that auto-starts on login and auto-restarts on crash. Service runs set `OCX_SERVICE=1` so a restart
-doesn't churn the Codex config.
+Run opencodex as a login-managed background service (macOS **launchd**, Linux **systemd user unit**,
+Windows **Task Scheduler**) that auto-starts on login and auto-restarts on crash. Service runs set
+`OCX_SERVICE=1` so a restart doesn't churn the Codex config.
 
 | Subcommand | Action |
 | --- | --- |

@@ -11,7 +11,7 @@ sends your traffic anywhere except the provider you configure.
 | Requirement | Why |
 | --- | --- |
 | **[Bun](https://bun.sh) ≥ 1.1** (recommended) or **Node ≥ 20** | `ocx` runs on the Bun runtime; the service runner invokes `bun`. |
-| **[OpenAI Codex](https://openai.com/codex)** (CLI, App, or SDK) | The client opencodex sits in front of. opencodex writes to `~/.codex/config.toml`. |
+| **[OpenAI Codex](https://openai.com/codex)** (CLI, App, or SDK) | The client opencodex sits in front of. opencodex writes to `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`). |
 | A provider account or API key | Anthropic, xAI, Kimi, Ollama Cloud, OpenRouter, an OpenAI-compatible endpoint, or your ChatGPT login. |
 
 ## Install
@@ -55,7 +55,7 @@ cd gui && bun install && bun dev
 | `~/.opencodex/ocx.pid` | PID of the running proxy (single-instance guard). |
 | `~/.opencodex/auth.json` | Stored OAuth credentials (when you `ocx login`). |
 | `~/.opencodex/catalog-backup.json` | Pristine Codex model catalog, backed up before any edit. |
-| `~/.codex/config.toml` | opencodex appends a `[model_providers.opencodex]` table here on `ocx init`. |
+| `$CODEX_HOME/config.toml` | opencodex appends a `[model_providers.opencodex]` table here on `ocx init` (defaults to `~/.codex/config.toml`). |
 
 :::note
 opencodex never deletes your Codex config. Every injection is reversible — `ocx stop`, `ocx restore`,

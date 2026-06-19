@@ -28,6 +28,10 @@ function logPath(): string {
   return join(getConfigDir(), "service.log");
 }
 
+function windowsServiceScriptPath(): string {
+  return join(getConfigDir(), "opencodex-service.cmd");
+}
+
 function plistString(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -85,6 +89,31 @@ function sh(cmd: string): string {
   return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
 }
 
+function windowsBatchValue(value: string): string {
+  return value.replace(/%/g, "%%").replace(/[\r\n]/g, "");
+}
+
+function windowsBatchSet(name: string, value: string | undefined): string | null {
+  if (!value) return null;
+  return `set "${name}=${windowsBatchValue(value)}"`;
+}
+
+export function buildWindowsServiceScript(): string {
+  const { bun, cli } = cliEntry();
+  const path = process.env.PATH ?? "";
+  const lines = [
+    "@echo off",
+    "setlocal",
+    windowsBatchSet("OCX_SERVICE", "1"),
+    windowsBatchSet("PATH", path),
+    windowsBatchSet("CODEX_HOME", process.env.CODEX_HOME?.trim()),
+    `"${bun}" "${cli}" start`,
+    "set \"OCX_EXIT=%ERRORLEVEL%\"",
+    "endlocal & exit /b %OCX_EXIT%",
+  ].filter((line): line is string => Boolean(line));
+  return `${lines.join("\r\n")}\r\n`;
+}
+
 // ── macOS (launchd) ──
 function installLaunchd(): void {
   const dir = join(homedir(), "Library", "LaunchAgents");
@@ -106,14 +135,19 @@ function uninstallLaunchd(): void {
 
 // ── Windows (Task Scheduler) ──
 function installWindows(): void {
-  const { bun, cli } = cliEntry();
-  sh(`schtasks /create /tn ${TASK} /tr "\\"${bun}\\" \\"${cli}\\" start" /sc onlogon /rl highest /f`);
+  if (!existsSync(getConfigDir())) mkdirSync(getConfigDir(), { recursive: true });
+  const script = windowsServiceScriptPath();
+  writeFileSync(script, buildWindowsServiceScript(), "utf8");
+  sh(`schtasks /create /tn ${TASK} /tr "\\"${script}\\"" /sc onlogon /rl highest /f`);
   sh(`schtasks /run /tn ${TASK}`);
 }
 function startWindows(): void { sh(`schtasks /run /tn ${TASK}`); }
 function stopWindows(): void { try { sh(`schtasks /end /tn ${TASK}`); } catch { /* not running */ } }
 function statusWindows(): string { try { return sh(`schtasks /query /tn ${TASK}`); } catch { return ""; } }
-function uninstallWindows(): void { try { sh(`schtasks /delete /tn ${TASK} /f`); } catch { /* absent */ } }
+function uninstallWindows(): void {
+  try { sh(`schtasks /delete /tn ${TASK} /f`); } catch { /* absent */ }
+  if (existsSync(windowsServiceScriptPath())) unlinkSync(windowsServiceScriptPath());
+}
 
 // ── Linux (systemd user unit) ──
 function unitDir(): string {

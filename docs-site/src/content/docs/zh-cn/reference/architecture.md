@@ -14,10 +14,10 @@ src/
 ├── server.ts           # Bun.serve: /v1/* proxy + /api/* management API
 ├── router.ts           # model id → provider + adapter
 ├── config.ts           # ~/.opencodex/config.json, defaults, PID, env resolution
-├── service.ts          # launchd / Task Scheduler background service
+├── service.ts          # launchd / systemd / Task Scheduler background service
 ├── init.ts             # interactive setup wizard
 ├── bridge.ts           # AdapterEvent stream → Responses SSE
-├── codex-inject.ts     # ~/.codex/config.toml injection + restore
+├── codex-inject.ts     # $CODEX_HOME/config.toml injection + restore
 ├── codex-catalog.ts    # routed-model catalog merge + subagent ranking
 ├── model-cache.ts      # per-provider /models TTL cache
 ├── types.ts            # core interfaces + helpers (modelInList, namespacedToolName)

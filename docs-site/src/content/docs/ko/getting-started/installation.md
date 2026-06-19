@@ -11,7 +11,7 @@ opencodex는 단일 CLI인 `ocx`로 제공됩니다. 작은 로컬 HTTP 서버(B
 | 요구 사항 | 이유 |
 | --- | --- |
 | **[Bun](https://bun.sh) ≥ 1.1**(권장) 또는 **Node ≥ 20** | `ocx`는 Bun 런타임에서 실행되며, 서비스 러너가 `bun`을 호출합니다. |
-| **[OpenAI Codex](https://openai.com/codex)**(CLI, App, 또는 SDK) | opencodex가 앞단에 위치하는 클라이언트입니다. opencodex는 `~/.codex/config.toml`에 기록합니다. |
+| **[OpenAI Codex](https://openai.com/codex)**(CLI, App, 또는 SDK) | opencodex가 앞단에 위치하는 클라이언트입니다. opencodex는 `$CODEX_HOME/config.toml`(기본값 `~/.codex/config.toml`)에 기록합니다. |
 | 프로바이더 계정 또는 API 키 | Anthropic, xAI, Kimi, Ollama Cloud, OpenRouter, OpenAI 호환 엔드포인트, 또는 ChatGPT 로그인. |
 
 ## 설치
@@ -55,7 +55,7 @@ cd gui && bun install && bun dev
 | `~/.opencodex/ocx.pid` | 실행 중인 프록시의 PID(단일 인스턴스 가드). |
 | `~/.opencodex/auth.json` | 저장된 OAuth 자격 증명(`ocx login` 시). |
 | `~/.opencodex/catalog-backup.json` | 변경 전에 백업해 둔 원본 Codex 모델 카탈로그. |
-| `~/.codex/config.toml` | opencodex가 `ocx init` 시 여기에 `[model_providers.opencodex]` 테이블을 추가합니다. |
+| `$CODEX_HOME/config.toml` | opencodex가 `ocx init` 시 여기에 `[model_providers.opencodex]` 테이블을 추가합니다(기본값 `~/.codex/config.toml`). |
 
 :::note
 opencodex는 절대 Codex 설정을 삭제하지 않습니다. 모든 주입은 되돌릴 수 있습니다 — `ocx stop`, `ocx restore`,

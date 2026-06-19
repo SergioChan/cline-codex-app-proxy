@@ -4,7 +4,8 @@ description: How opencodex injects itself into Codex, syncs the model catalog, d
 ---
 
 opencodex makes Codex route through the proxy by editing two things Codex reads: its config
-(`~/.codex/config.toml`) and its model catalog. Every edit is idempotent and reversible.
+(`$CODEX_HOME/config.toml`, default `~/.codex/config.toml`) and its model catalog. Every edit is
+idempotent and reversible.
 
 ## Config injection
 
@@ -21,7 +22,7 @@ base_url = "http://localhost:10100/v1"
 wire_api = "responses"
 ```
 
-It also writes an optional profile at `~/.codex/opencodex.config.toml` so you can opt in explicitly:
+It also writes an optional profile at `$CODEX_HOME/opencodex.config.toml` so you can opt in explicitly:
 
 ```bash
 codex --profile opencodex "…"
@@ -35,8 +36,8 @@ duplicate copies before re-writing — so re-running `ocx init` / `ocx sync` nev
 
 ## Model catalog sync
 
-Codex shows models from an on-disk catalog (`~/.codex/opencodex-catalog.json` by default). On start
-and on `ocx sync`, opencodex:
+Codex shows models from an on-disk catalog (`$CODEX_HOME/opencodex-catalog.json` by default). On
+start and on `ocx sync`, opencodex:
 
 1. **Backs up** the pristine catalog once to `~/.opencodex/catalog-backup.json` (so featuring is
    reversible).
