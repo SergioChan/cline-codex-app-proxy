@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import AddProviderModal from "../components/AddProviderModal";
 import { Notice } from "../ui";
 import { IconPlus, IconTrash, IconLock, IconExternal } from "../icons";
+import { useT } from "../i18n";
 
 interface Config {
   port: number;
@@ -20,16 +21,20 @@ const OAUTH_LABELS: Record<string, string> = {
 const oauthLabel = (id: string) => OAUTH_LABELS[id] ?? id;
 
 export default function Providers({ apiBase }: { apiBase: string }) {
+  const t = useT();
   const [config, setConfig] = useState<Config | null>(null);
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState("");
+  const [statusOk, setStatusOk] = useState(false);
   const [oauthProviders, setOauthProviders] = useState<string[]>([]);
   const [oauthStatus, setOauthStatus] = useState<Record<string, OAuthStatus>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [loginInfo, setLoginInfo] = useState<{ provider: string; url?: string; instructions?: string } | null>(null);
   const aliveRef = useRef(true);
+
+  const notify = (msg: string, ok: boolean) => { setStatus(msg); setStatusOk(ok); };
 
   useEffect(() => { aliveRef.current = true; return () => { aliveRef.current = false; }; }, []);
 
@@ -40,7 +45,7 @@ export default function Providers({ apiBase }: { apiBase: string }) {
       setConfig(data);
       setDraft(JSON.stringify(data, null, 2));
     } catch {
-      setStatus("Failed to load config");
+      notify(t("prov.loadConfigFail"), false);
     }
   };
 
@@ -68,14 +73,14 @@ export default function Providers({ apiBase }: { apiBase: string }) {
         body: JSON.stringify(parsed),
       });
       if (res.ok) {
-        setStatus("Saved! Restart proxy to apply.");
+        notify(t("prov.saved"), true);
         setEditing(false);
         fetchConfig();
       } else {
-        setStatus("Save failed");
+        notify(t("prov.saveFailed"), false);
       }
     } catch {
-      setStatus("Invalid JSON");
+      notify(t("prov.invalidJson"), false);
     }
   };
 
@@ -90,7 +95,7 @@ export default function Providers({ apiBase }: { apiBase: string }) {
         body: JSON.stringify({ provider }),
       });
       const data = await res.json();
-      if (!res.ok) { setStatus(data.error || `${provider} login failed to start`); return; }
+      if (!res.ok) { notify(data.error || t("prov.loginFailStart", { provider: oauthLabel(provider) }), false); return; }
       // The server opens the browser itself (popup-safe). Show the URL/device code as a fallback.
       if (data.url || data.instructions) setLoginInfo({ provider, url: data.url, instructions: data.instructions });
       // Poll until the loopback callback (or device flow) completes.
@@ -100,15 +105,15 @@ export default function Providers({ apiBase }: { apiBase: string }) {
         if (!s) continue;
         if (s.loggedIn) {
           setOauthStatus(prev => ({ ...prev, [provider]: s }));
-          setStatus(`Logged in to ${oauthLabel(provider)}. Run ocx sync (or it applies live) to list its models.`);
+          notify(t("prov.loginOk", { provider: oauthLabel(provider), cmd: "ocx sync" }), true);
           setLoginInfo(null);
           fetchConfig();
           break;
         }
-        if (s.error) { setOauthStatus(prev => ({ ...prev, [provider]: s })); setStatus(`${provider} login error: ${s.error}`); break; }
+        if (s.error) { setOauthStatus(prev => ({ ...prev, [provider]: s })); notify(t("prov.loginError", { provider: oauthLabel(provider), error: s.error }), false); break; }
       }
     } catch {
-      setStatus(`${provider} login request failed`);
+      notify(t("prov.loginRequestFail", { provider: oauthLabel(provider) }), false);
     } finally {
       if (aliveRef.current) setBusy(null);
     }
@@ -117,40 +122,38 @@ export default function Providers({ apiBase }: { apiBase: string }) {
   const logoutOAuth = async (provider: string) => {
     await fetch(`${apiBase}/api/oauth/logout?provider=${provider}`, { method: "POST" }).catch(() => {});
     setOauthStatus(prev => ({ ...prev, [provider]: { loggedIn: false } }));
-    setStatus(`Logged out of ${oauthLabel(provider)}.`);
+    notify(t("prov.logoutOk", { provider: oauthLabel(provider) }), true);
     fetchConfig();
   };
 
   const removeProvider = async (name: string) => {
-    if (!window.confirm(`Remove provider "${name}"? Its models disappear from Codex's picker.`)) return;
+    if (!window.confirm(t("prov.removeConfirm", { name }))) return;
     const res = await fetch(`${apiBase}/api/providers?name=${encodeURIComponent(name)}`, { method: "DELETE" });
-    if (res.ok) { setStatus(`Removed "${name}".`); fetchConfig(); fetchOauth(); }
-    else setStatus(`Failed to remove "${name}".`);
+    if (res.ok) { notify(t("prov.removed", { name }), true); fetchConfig(); fetchOauth(); }
+    else notify(t("prov.removeFail", { name }), false);
   };
 
-  if (!config) return <div className="muted">Loading…</div>;
-
-  const statusOk = status.includes("Saved") || status.includes("Logged in") || status.includes("Removed") || status.includes("Added") || status.includes("Logged out");
+  if (!config) return <div className="muted">{t("prov.loadingConfig")}</div>;
 
   return (
     <>
       <div className="page-head">
-        <h2>Providers</h2>
+        <h2>{t("nav.providers")}</h2>
         <div className="row">
           {editing ? (
             <>
-              <button className="btn btn-primary" onClick={saveConfig}>Save</button>
-              <button className="btn btn-ghost" onClick={() => { setEditing(false); setDraft(JSON.stringify(config, null, 2)); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveConfig}>{t("common.save")}</button>
+              <button className="btn btn-ghost" onClick={() => { setEditing(false); setDraft(JSON.stringify(config, null, 2)); }}>{t("common.cancel")}</button>
             </>
           ) : (
             <>
-              <button className="btn btn-primary" onClick={() => setAdding(true)}><IconPlus />Add Provider</button>
-              <button className="btn btn-ghost" onClick={() => setEditing(true)}>Edit JSON</button>
+              <button className="btn btn-primary" onClick={() => setAdding(true)}><IconPlus />{t("prov.add")}</button>
+              <button className="btn btn-ghost" onClick={() => setEditing(true)}>{t("prov.editJson")}</button>
             </>
           )}
         </div>
       </div>
-      <p className="page-sub">Configure the upstream providers opencodex routes into Codex. Log in with an account, add a provider, or edit the raw config.</p>
+      <p className="page-sub">{t("prov.subtitle")}</p>
 
       {status && <Notice tone={statusOk ? "ok" : "err"}>{status}</Notice>}
 
@@ -158,10 +161,10 @@ export default function Providers({ apiBase }: { apiBase: string }) {
       <div className="panel panel-accent" style={{ marginBottom: 18 }}>
         <div className="row" style={{ marginBottom: 14 }}>
           <IconLock style={{ width: 16, height: 16, color: "var(--accent)" }} />
-          <span style={{ fontWeight: 600 }}>Account login</span>
+          <span style={{ fontWeight: 600 }}>{t("prov.accountLogin")}</span>
         </div>
         <div className="stack" style={{ gap: 12 }}>
-          {oauthProviders.length === 0 && <span className="muted" style={{ fontSize: 13 }}>No OAuth providers available.</span>}
+          {oauthProviders.length === 0 && <span className="muted" style={{ fontSize: 13 }}>{t("prov.noOauth")}</span>}
           {oauthProviders.map(p => {
             const st = oauthStatus[p] ?? { loggedIn: false };
             const isBusy = busy === p;
@@ -171,22 +174,22 @@ export default function Providers({ apiBase }: { apiBase: string }) {
                   <span style={{ fontWeight: 600 }}>{oauthLabel(p)}</span>
                   {st.loggedIn ? (
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--green)" }}>
-                      <span className="dot dot-green" />logged in{st.email ? ` (${st.email})` : ""}
+                      <span className="dot dot-green" />{t("prov.loggedIn")}{st.email ? ` (${st.email})` : ""}
                     </span>
                   ) : (
-                    <span className="muted">not logged in</span>
+                    <span className="muted">{t("prov.notLoggedIn")}</span>
                   )}
                 </span>
                 {st.loggedIn ? (
-                  <button className="btn btn-ghost btn-sm" onClick={() => logoutOAuth(p)}>Logout</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => logoutOAuth(p)}>{t("prov.logout")}</button>
                 ) : (
                   <button className="btn btn-primary btn-sm" onClick={() => loginOAuth(p)} disabled={isBusy}>
-                    {isBusy ? <><span className="spin" />Waiting for browser…</> : <><IconLock />Login with {oauthLabel(p)}</>}
+                    {isBusy ? <><span className="spin" />{t("prov.waitingBrowser")}</> : <><IconLock />{t("prov.loginWith", { provider: oauthLabel(p) })}</>}
                   </button>
                 )}
                 {loginInfo?.provider === p && (loginInfo.url || loginInfo.instructions) && (
                   <span className="muted" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 8 }}>
-                    {loginInfo.url && <a href={loginInfo.url} target="_blank" rel="noreferrer" className="link-btn" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><IconExternal />Didn't open? Click here</a>}
+                    {loginInfo.url && <a href={loginInfo.url} target="_blank" rel="noreferrer" className="link-btn" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><IconExternal />{t("prov.didntOpen")}</a>}
                     {loginInfo.instructions && <span>{loginInfo.instructions}</span>}
                   </span>
                 )}
@@ -206,7 +209,7 @@ export default function Providers({ apiBase }: { apiBase: string }) {
       ) : (
         <div className="stack" style={{ gap: 8 }}>
           <div className="muted" style={{ fontSize: 13, marginBottom: 4 }}>
-            Port: <code className="chip">{config.port}</code> · Default: <code className="chip">{config.defaultProvider}</code>
+            {t("prov.port")}: <code className="chip">{config.port}</code> · {t("prov.default")}: <code className="chip">{config.defaultProvider}</code>
           </div>
           {Object.entries(config.providers).map(([name, prov]) => (
             <div key={name} className="card prov-card">
@@ -222,7 +225,7 @@ export default function Providers({ apiBase }: { apiBase: string }) {
                   {prov.apiKey && <> · {prov.apiKey}</>}
                 </div>
               </div>
-              <button className="btn btn-danger btn-sm" onClick={() => removeProvider(name)} aria-label={`Remove ${name}`} style={{ flexShrink: 0 }}><IconTrash />Remove</button>
+              <button className="btn btn-danger btn-sm" onClick={() => removeProvider(name)} aria-label={t("sub.removeAria", { m: name })} style={{ flexShrink: 0 }}><IconTrash />{t("common.remove")}</button>
             </div>
           ))}
         </div>
@@ -232,7 +235,7 @@ export default function Providers({ apiBase }: { apiBase: string }) {
           apiBase={apiBase}
           existingNames={Object.keys(config.providers)}
           onClose={() => setAdding(false)}
-          onAdded={(name) => { setAdding(false); setStatus(`Added "${name}". Live now — run ocx sync (or restart) to list its models in Codex's picker.`); fetchConfig(); fetchOauth(); }}
+          onAdded={(name) => { setAdding(false); notify(t("prov.added", { name, cmd: "ocx sync" }), true); fetchConfig(); fetchOauth(); }}
         />
       )}
     </>

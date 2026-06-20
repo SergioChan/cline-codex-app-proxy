@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useI18n, LOCALES } from "../i18n";
 
 interface LogEntry {
   timestamp: number;
@@ -9,8 +10,10 @@ interface LogEntry {
 }
 
 export default function Logs({ apiBase }: { apiBase: string }) {
+  const { t, locale } = useI18n();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const localeTag = LOCALES.find(l => l.code === locale)?.htmlLang;
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -30,32 +33,32 @@ export default function Logs({ apiBase }: { apiBase: string }) {
   return (
     <>
       <div className="page-head">
-        <h2>Request Logs</h2>
+        <h2>{t("logs.title")}</h2>
         <label className="muted" style={{ fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} />
-          Auto-refresh
+          {t("logs.autoRefresh")}
         </label>
       </div>
-      <p className="page-sub">Recent requests routed through the local opencodex proxy, newest first.</p>
+      <p className="page-sub">{t("logs.subtitle")}</p>
 
       {logs.length === 0 ? (
-        <div className="empty">No requests yet.</div>
+        <div className="empty">{t("logs.noRequests")}</div>
       ) : (
         <div className="tbl-wrap">
           <table className="tbl">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Model</th>
-                <th>Provider</th>
-                <th>Status</th>
-                <th className="num">Duration</th>
+                <th>{t("logs.col.time")}</th>
+                <th>{t("logs.col.model")}</th>
+                <th>{t("logs.col.provider")}</th>
+                <th>{t("logs.col.status")}</th>
+                <th className="num">{t("logs.col.duration")}</th>
               </tr>
             </thead>
             <tbody>
               {[...logs].reverse().map((log, i) => (
                 <tr key={i}>
-                  <td className="muted mono">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                  <td className="muted mono">{new Date(log.timestamp).toLocaleTimeString(localeTag)}</td>
                   <td className="mono">{log.model}</td>
                   <td className="muted">{log.provider}</td>
                   <td>

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Notice } from "../ui";
 import { IconArrowUp, IconArrowDown, IconX, IconCheck, IconSearch, IconBot } from "../icons";
+import { useT, Trans } from "../i18n";
 
 export default function Subagents({ apiBase }: { apiBase: string }) {
+  const t = useT();
   const [available, setAvailable] = useState<string[]>([]);
   const [chosen, setChosen] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -18,7 +20,7 @@ export default function Subagents({ apiBase }: { apiBase: string }) {
       setChosen((r.chosen ?? []).filter((m: string) => avail.includes(m)));
     } catch {
       setOk(false);
-      setStatus("Failed to load models — is the proxy running?");
+      setStatus(t("sub.loadFail"));
     } finally {
       setLoading(false);
     }
@@ -50,11 +52,11 @@ export default function Subagents({ apiBase }: { apiBase: string }) {
       const d = await r.json();
       setOk(r.ok);
       setStatus(r.ok
-        ? `Saved ${d.applied?.length ?? 0} models. Start a new Codex session (or run 'ocx sync') to see them as spawn_agent overrides.`
-        : (d.error || "Save failed"));
+        ? t("sub.saved", { n: d.applied?.length ?? 0, cmd: "ocx sync" })
+        : (d.error || t("sub.saveFailed")));
     } catch {
       setOk(false);
-      setStatus("Network error — is the proxy running?");
+      setStatus(t("sub.networkError"));
     }
   };
 
@@ -63,35 +65,31 @@ export default function Subagents({ apiBase }: { apiBase: string }) {
     return available.filter(m => !q || m.toLowerCase().includes(q));
   }, [available, query]);
 
-  if (loading) return <div className="muted" style={{ padding: 8 }}>Loading…</div>;
+  if (loading) return <div className="muted" style={{ padding: 8 }}>{t("sub.loading")}</div>;
 
   return (
     <>
-      <div className="page-head"><h2>Subagents</h2></div>
-      <p className="page-sub">
-        Codex's <code className="chip">spawn_agent</code> advertises only the first <b>5</b> models (by priority) as overrides.
-        Pick up to 5 here — native gpt or routed — and opencodex sets their catalog priority so exactly
-        these lead. Any other model is still callable by its exact name; this only controls what's shown.
-      </p>
+      <div className="page-head"><h2>{t("nav.subagents")}</h2></div>
+      <p className="page-sub"><Trans k="sub.subtitle" cmd="spawn_agent" /></p>
 
       {status && <Notice tone={ok ? "ok" : "err"}>{status}</Notice>}
 
-      <div className="h-section">Featured <span className="count">{chosen.length}/5</span></div>
+      <div className="h-section">{t("sub.featured")} <span className="count">{chosen.length}/5</span></div>
       {chosen.length === 0 ? (
-        <div className="empty">None selected — pick from the list below.</div>
+        <div className="empty">{t("sub.noneSelected")}</div>
       ) : (
         <div className="stack" style={{ gap: 8 }}>
           {chosen.map((m, i) => (
             <div key={m} className="card panel-accent row" style={{ padding: "8px 12px", gap: 10 }}>
               <span className="mono" style={{ width: 18, color: "var(--accent)", fontWeight: 700 }}>{i + 1}</span>
               <code className="mono" style={{ flex: 1, color: "var(--text)" }}>{m}</code>
-              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${m} up`}>
+              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label={t("sub.moveUp", { m })}>
                 <IconArrowUp />
               </button>
-              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => move(i, 1)} disabled={i === chosen.length - 1} aria-label={`Move ${m} down`}>
+              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => move(i, 1)} disabled={i === chosen.length - 1} aria-label={t("sub.moveDown", { m })}>
                 <IconArrowDown />
               </button>
-              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => toggle(m)} aria-label={`Remove ${m}`} style={{ color: "var(--red)" }}>
+              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => toggle(m)} aria-label={t("sub.removeAria", { m })} style={{ color: "var(--red)" }}>
                 <IconX />
               </button>
             </div>
@@ -100,17 +98,17 @@ export default function Subagents({ apiBase }: { apiBase: string }) {
       )}
 
       <div style={{ marginTop: 14 }}>
-        <button className="btn btn-primary" onClick={save}>Save</button>
+        <button className="btn btn-primary" onClick={save}>{t("common.save")}</button>
       </div>
 
-      <div className="h-section">Models <span className="count">{filtered.length}</span></div>
+      <div className="h-section">{t("sub.models")} <span className="count">{filtered.length}</span></div>
       <div style={{ position: "relative", marginBottom: 10 }}>
         <IconSearch style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "var(--faint)", pointerEvents: "none" }} />
         <input
           className="input"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Search models (native gpt + routed)…"
+          placeholder={t("sub.search")}
           style={{ paddingLeft: 34 }}
         />
       </div>
@@ -141,7 +139,7 @@ export default function Subagents({ apiBase }: { apiBase: string }) {
           );
         })}
         {filtered.length === 0 && (
-          <div className="empty">No models — log into a provider or add one first.</div>
+          <div className="empty">{t("sub.noModels")}</div>
         )}
       </div>
     </>
