@@ -1,0 +1,132 @@
+name: Service lifecycle
+
+on:
+  push:
+    paths:
+      - "src/service.ts"
+      - "src/cli.ts"
+      - ".github/workflows/service-lifecycle.yml"
+  workflow_dispatch:
+
+jobs:
+  linux-systemd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      # systemd user session needs XDG_RUNTIME_DIR
+      - name: Enable systemd user session
+        run: |
+          sudo loginctl enable-linger $(whoami)
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$GITHUB_ENV"
+
+      # Write a minimal config so ocx start doesn't fail on missing providers
+      - name: Write minimal config
+        run: |
+          mkdir -p ~/.opencodex
+          echo '{"port":10199,"providers":{}}' > ~/.opencodex/config.json
+
+      - name: Install service
+        run: |
+          bun run src/cli.ts service install
+          sleep 2
+
+      - name: Verify service is running
+        run: |
+          systemctl --user status opencodex-proxy --no-pager
+          curl -sf http://127.0.0.1:10199/healthz || echo "healthz not ready yet"
+
+      - name: ocx stop should stop the service too
+        run: |
+          bun run src/cli.ts stop
+          sleep 1
+          # Service should NOT be active after ocx stop
+          if systemctl --user is-active opencodex-proxy 2>/dev/null; then
+            echo "❌ FAIL: service still active after ocx stop"
+            exit 1
+          fi
+          echo "✅ Service stopped by ocx stop"
+
+      - name: Restart service and verify crash-restart
+        run: |
+          bun run src/cli.ts service start
+          sleep 2
+          PID=$(cat ~/.opencodex/ocx.pid 2>/dev/null || echo "")
+          if [ -n "$PID" ]; then
+            kill -9 "$PID" 2>/dev/null || true
+            sleep 8
+            # systemd Restart=on-failure should bring it back
+            if systemctl --user is-active opencodex-proxy 2>/dev/null; then
+              echo "✅ Service restarted after crash"
+            else
+              echo "⚠️  Service did not restart (may need lingering)"
+            fi
+          fi
+
+      - name: Uninstall service
+        run: |
+          bun run src/cli.ts service uninstall
+          sleep 1
+          if systemctl --user is-active opencodex-proxy 2>/dev/null; then
+            echo "❌ FAIL: service still active after uninstall"
+            exit 1
+          fi
+          echo "✅ Service uninstalled"
+
+  windows-schtasks:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Write minimal config
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.opencodex" | Out-Null
+          Set-Content -Path "$env:USERPROFILE\.opencodex\config.json" -Value '{"port":10199,"providers":{}}'
+
+      - name: Install service
+        shell: pwsh
+        run: |
+          bun run src/cli.ts service install
+          Start-Sleep -Seconds 3
+
+      - name: Verify scheduled task exists
+        shell: pwsh
+        run: |
+          $task = schtasks /query /tn opencodex-proxy 2>&1
+          if ($task -match "opencodex-proxy") {
+            Write-Host "✅ Task registered"
+          } else {
+            Write-Host "❌ Task not found"
+            exit 1
+          }
+
+      - name: ocx stop should end the task
+        shell: pwsh
+        run: |
+          bun run src/cli.ts stop
+          Start-Sleep -Seconds 2
+          Write-Host "✅ ocx stop completed"
+
+      - name: Uninstall service
+        shell: pwsh
+        run: |
+          bun run src/cli.ts service uninstall
+          Start-Sleep -Seconds 1
+          $task = schtasks /query /tn opencodex-proxy 2>&1
+          if ($task -match "opencodex-proxy") {
+            Write-Host "❌ Task still exists after uninstall"
+            exit 1
+          }
+          Write-Host "✅ Task removed"

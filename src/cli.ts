@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { restoreNativeCodex } from "./codex-inject";
 import { loadConfig, readPid, removePid, writePid } from "./config";
-import { serviceCommand } from "./service";
+import { serviceCommand, stopServiceIfInstalled } from "./service";
 import { startServer } from "./server";
 import { maybeShowStarPrompt } from "./star-prompt";
 
@@ -129,6 +129,9 @@ function waitForExit(pid: number, timeoutMs: number): boolean {
 }
 
 function handleStop() {
+  const stoppedService = stopServiceIfInstalled();
+  if (stoppedService) console.log("🛑 Service manager stopped (won't respawn).");
+
   const pid = readPid();
   let stopFailed = false;
   if (pid) {
@@ -140,10 +143,9 @@ function handleStop() {
       stopFailed = true;
       console.error(`❌ Failed to stop proxy (PID ${pid}).`);
     }
-  } else {
+  } else if (!stoppedService) {
     console.log("No running proxy found.");
   }
-  // Recover native Codex so plain `codex` keeps working while the proxy is down.
   const r = restoreNativeCodex();
   console.log(`↩️  ${r.message}`);
   if (stopFailed) process.exit(1);

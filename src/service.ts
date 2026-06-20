@@ -236,6 +236,26 @@ function platformOps(): ServiceOps | null {
   return null;
 }
 
+/**
+ * If a service is installed, stop it so the process manager doesn't respawn after `ocx stop`.
+ * Returns true if a service was found and stopped.
+ */
+export function stopServiceIfInstalled(): boolean {
+  if (process.platform === "darwin") {
+    if (existsSync(plistPath())) {
+      try { stopLaunchd(); return true; } catch { return false; }
+    }
+  } else if (process.platform === "win32") {
+    try {
+      const q = sh(`schtasks /query /tn ${TASK} 2>nul`);
+      if (q.includes(TASK)) { stopWindows(); return true; }
+    } catch { /* task not found */ }
+  } else if (process.platform === "linux" && isSystemd() && existsSync(unitPath())) {
+    try { stopSystemd(); return true; } catch { return false; }
+  }
+  return false;
+}
+
 export function serviceCommand(sub?: string): void {
   const ops = platformOps();
   if (!ops) {
