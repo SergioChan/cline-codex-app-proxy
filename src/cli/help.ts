@@ -79,6 +79,14 @@ const helpEntries: Record<string, HelpEntry> = {
       "Run `ocx provider --help` for full usage and examples.",
     ],
   },
+  cline: {
+    usage: "ocx cline <setup|status|remove>",
+    summary: "Configure Cline Coding Plan models for the Codex desktop App.",
+    details: [
+      "Setup reads the API key from a hidden prompt, stdin, or a mode-0600 file.",
+      "It preserves all non-Cline providers and never accepts an API key in argv.",
+    ],
+  },
   models: {
     usage: "ocx models [--provider <name>] [--json]",
     summary: "List available models from configured providers.",
@@ -144,6 +152,7 @@ Usage:
   ocx restart                  Stop and restart the proxy
   ocx health [--json]          Check proxy health (exit 0=healthy, 1=not)
   ocx provider <sub>          Manage providers (list|add|remove|show|set-default)
+  ocx cline <sub>             Configure Cline models for Codex App (setup|status|remove)
   ocx models [--json]         List available models from configured providers
   ocx claude [args...]        Launch Claude Code wired to the proxy (model discovery on)
   ocx help [command]          Show help

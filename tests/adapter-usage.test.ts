@@ -44,6 +44,24 @@ describe("adapter reasoning and usage details", () => {
     });
   });
 
+  test("OpenAI-compatible responses map Cline reasoning fields", async () => {
+    const adapter = createOpenAIChatAdapter(provider);
+    const nonStreaming = await adapter.parseResponse?.(new Response(JSON.stringify({
+      choices: [{ message: { reasoning: "cline thought", content: "answer" } }],
+      usage: { prompt_tokens: 1, completion_tokens: 2 },
+    })));
+    expect(nonStreaming).toContainEqual({ type: "reasoning_raw_delta", text: "cline thought" });
+
+    const streaming = new Response([
+      "data: {\"choices\":[{\"delta\":{\"reasoning\":\"cline stream\"}}]}\n\n",
+      "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+      "data: [DONE]\n\n",
+    ].join(""));
+    const events = [];
+    for await (const event of adapter.parseStream(streaming)) events.push(event);
+    expect(events).toContainEqual({ type: "reasoning_raw_delta", text: "cline stream" });
+  });
+
   test("OpenAI-compatible non-OpenAI providers receive the tool catalog nudge", async () => {
     const adapter = createOpenAIChatAdapter(provider);
     const request = await adapter.buildRequest({

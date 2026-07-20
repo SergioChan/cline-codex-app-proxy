@@ -615,8 +615,11 @@ export function createOpenAIChatAdapter(provider: OcxProviderConfig): ProviderAd
             yield { type: "text_delta", text: delta.content };
           }
 
-          if (typeof delta.reasoning_content === "string" && delta.reasoning_content.length > 0) {
-            yield { type: "reasoning_raw_delta", text: delta.reasoning_content };
+          const reasoning = typeof delta.reasoning_content === "string"
+            ? delta.reasoning_content
+            : delta.reasoning;
+          if (typeof reasoning === "string" && reasoning.length > 0) {
+            yield { type: "reasoning_raw_delta", text: reasoning };
           }
 
           const toolCalls = delta.tool_calls as { index?: number; id?: string; function?: { name?: string; arguments?: string } }[] | undefined;
@@ -709,8 +712,11 @@ export function createOpenAIChatAdapter(provider: OcxProviderConfig): ProviderAd
       if (typeof msg.content === "string") {
         events.push({ type: "text_delta", text: msg.content });
       }
-      if (typeof msg.reasoning_content === "string" && msg.reasoning_content.length > 0) {
-        events.push({ type: "reasoning_raw_delta", text: msg.reasoning_content });
+      const reasoning = typeof msg.reasoning_content === "string"
+        ? msg.reasoning_content
+        : msg.reasoning;
+      if (typeof reasoning === "string" && reasoning.length > 0) {
+        events.push({ type: "reasoning_raw_delta", text: reasoning });
       }
       const toolCalls = msg.tool_calls as { id: string; function: { name: string; arguments: string } }[] | undefined;
       if (toolCalls) {

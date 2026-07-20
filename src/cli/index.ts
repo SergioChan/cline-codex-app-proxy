@@ -628,6 +628,16 @@ switch (command) {
     await handleProviderCommand(args.slice(1));
     break;
   }
+  case "cline": {
+    const { handleClineCommand } = await import("./cline");
+    try {
+      await handleClineCommand(args.slice(1));
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
+    break;
+  }
   case "models": {
     const { handleModels } = await import("./models");
     handleModels(args.slice(1));
