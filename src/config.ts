@@ -357,6 +357,20 @@ export function positiveIntegerRecordConfigError(value: unknown, field: string):
   return null;
 }
 
+export function nonBlankStringRecordConfigError(value: unknown, field: string): string | null {
+  if (value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return `${field} must be a plain object`;
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return `${field} must be a plain object with own properties`;
+  for (const [key, entry] of Object.entries(value)) {
+    if (!key.trim()) return `${field} keys must be nonblank model ids`;
+    if (typeof entry !== "string" || !entry.trim()) {
+      return `${field}.${key} must be a nonblank string`;
+    }
+  }
+  return null;
+}
+
 const configSchema = z.object({
   port: z.number().int().min(0).max(65535).default(10100),
   providers: z.record(z.string(), providerConfigSchema),
@@ -415,6 +429,17 @@ const configSchema = z.object({
         code: "custom",
         path: ["providers", name, "modelMaxInputTokens"],
         message: maxInputError,
+      });
+    }
+    const displayNamesError = nonBlankStringRecordConfigError(
+      (provider as { modelDisplayNames?: unknown }).modelDisplayNames,
+      "modelDisplayNames",
+    );
+    if (displayNamesError) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["providers", name, "modelDisplayNames"],
+        message: displayNamesError,
       });
     }
     if (Object.hasOwn(provider, "codexAccountMode") && provider.codexAccountMode !== undefined) {

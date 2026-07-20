@@ -615,6 +615,11 @@ export interface OcxProviderConfig {
    */
   liveModels?: boolean;
   /**
+   * Model-specific labels shown in the Codex model picker. Keys are upstream model ids.
+   * This changes only catalog display names; routed slugs and upstream model ids stay unchanged.
+   */
+  modelDisplayNames?: Record<string, string>;
+  /**
    * Per-provider catalog allowlist. When non-empty, ONLY these model ids are emitted to Codex's
    * catalog and `/v1/models` — live discovery still runs, this just narrows what ships (so a proxy
    * exposing thousands of models, or an aggregator like OpenRouter, doesn't bloat the catalog).

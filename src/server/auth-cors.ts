@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { formatErrorResponse } from "../bridge";
 import {
   codexAutoStartEnabled,
+  nonBlankStringRecordConfigError,
   positiveIntegerRecordConfigError,
   providerBaseUrlConfigError,
   providerHeadersConfigError,
@@ -226,6 +227,8 @@ export function providerManagementConfigError(name: unknown, provider: unknown):
   if (headersError) return `provider ${name} ${headersError}`;
   const maxInputError = positiveIntegerRecordConfigError(raw.modelMaxInputTokens, "modelMaxInputTokens");
   if (maxInputError) return `provider ${name} ${maxInputError}`;
+  const displayNamesError = nonBlankStringRecordConfigError(raw.modelDisplayNames, "modelDisplayNames");
+  if (displayNamesError) return `provider ${name} ${displayNamesError}`;
   if (typed.authMode === "local") {
     // "local" bypasses key-requirement enforcement (api-keys/key-failover treat non-oauth/
     // forward as key auth; openai-chat skips credential checks for local). Only providers

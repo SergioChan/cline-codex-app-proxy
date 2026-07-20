@@ -2,7 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { augmentRoutedModelsWithJawcodeMetadata, augmentRoutedModelsWithRegistryOpenAiApiRows, buildCatalogEntries, deriveComboCatalogModel, exactComboCatalogSlugs, filterCatalogVisibleModels, filterSupportedNativeSlugs, gatherRoutedModels, isDatedVariantId, isMediaGenerationModelId, loadBundledCodexCatalog, materializeBundledCodexCatalog, mergeCatalogEntriesForSync, NATIVE_OPENAI_MODELS, normalizeRoutedCatalogEntry, resetCatalogRuntimeStateForTests, resetOpenAiApiCatalogWarningStateForTests } from "../src/codex/catalog";
+import { applyProviderConfigHints, augmentRoutedModelsWithJawcodeMetadata, augmentRoutedModelsWithRegistryOpenAiApiRows, buildCatalogEntries, deriveComboCatalogModel, exactComboCatalogSlugs, filterCatalogVisibleModels, filterSupportedNativeSlugs, gatherRoutedModels, isDatedVariantId, isMediaGenerationModelId, loadBundledCodexCatalog, materializeBundledCodexCatalog, mergeCatalogEntriesForSync, NATIVE_OPENAI_MODELS, normalizeRoutedCatalogEntry, resetCatalogRuntimeStateForTests, resetOpenAiApiCatalogWarningStateForTests } from "../src/codex/catalog";
 import {
   CURSOR_STATIC_MODELS,
   filterCursorConfiguredModelsByLiveDiscovery,
@@ -381,6 +381,32 @@ describe("Codex catalog routed normalization", () => {
     expect(routed?.base_instructions).toContain("claude-sonnet-4-6");
     expect(routed?.default_reasoning_level).toBe("medium");
   });
+
+  test("modelDisplayNames changes only routed picker labels", () => {
+    const provider = {
+      adapter: "openai-chat",
+      baseUrl: "https://api.example.test/v1",
+      modelDisplayNames: {
+        "cline-pass/kimi-k3": "  Kimi K3  ",
+        "cline-pass/glm-5.2": "GLM 5.2",
+      },
+    };
+    const models = [
+      applyProviderConfigHints("cline", provider, { provider: "cline", id: "cline-pass/kimi-k3" }),
+      applyProviderConfigHints("cline", provider, { provider: "cline", id: "cline-pass/glm-5.2" }),
+      applyProviderConfigHints("cline", provider, { provider: "cline", id: "cline-pass/other" }),
+    ];
+
+    for (const template of [nativeTemplate(), null]) {
+      const entries = buildCatalogEntries(template, [], models);
+      expect(entries.map(entry => [entry.slug, entry.display_name])).toEqual([
+        ["cline/cline-pass-kimi-k3", "Kimi K3"],
+        ["cline/cline-pass-glm-5.2", "GLM 5.2"],
+        ["cline/cline-pass-other", "cline/cline-pass-other"],
+      ]);
+    }
+  });
+
   test("buildCatalogEntries advertises parallel tool calls only for Cursor routed models", () => {
     const entries = buildCatalogEntries(nativeTemplate(), [], [
       { provider: "cursor", id: "composer-2.5", owned_by: "cursor" },

@@ -306,6 +306,8 @@ export interface CatalogModel {
   id: string;
   provider: string;
   owned_by?: string;
+  /** Optional Codex picker label supplied by OcxProviderConfig.modelDisplayNames. */
+  displayName?: string;
   reasoningEfforts?: string[];
   defaultReasoningEffort?: string;
   contextWindow?: number;
@@ -872,7 +874,7 @@ function deriveEntry(
   if (template) {
     const e = JSON.parse(JSON.stringify(template)) as RawEntry;
     e.slug = slug;
-    e.display_name = slug;
+    e.display_name = slug.includes("/") ? (model?.displayName ?? slug) : slug;
     e.description = desc;
     e.priority = priority;
     e.visibility = "list";
@@ -918,7 +920,7 @@ function deriveEntry(
   }
   // Fallback when no template is available (best-effort; strict parser may need more).
   const entry: RawEntry = {
-    slug, display_name: slug, description: desc,
+    slug, display_name: slug.includes("/") ? (model?.displayName ?? slug) : slug, description: desc,
     shell_type: "shell_command", visibility: "list", supported_in_api: true,
     priority, base_instructions: "You are a helpful coding assistant.",
     ...(slug.includes("/") ? { web_search_tool_type: "text_and_image", supports_search_tool: true } : {}),
@@ -1089,6 +1091,13 @@ function configuredContextWindow(prov: OcxProviderConfig, id: string): number | 
   return typeof configured === "number" && configured > 0 ? configured : undefined;
 }
 
+function configuredDisplayName(prov: OcxProviderConfig, id: string): string | undefined {
+  const configured = modelRecordValue(prov.modelDisplayNames, id);
+  return typeof configured === "string" && configured.trim().length > 0
+    ? configured.trim()
+    : undefined;
+}
+
 function configuredInputModalities(prov: OcxProviderConfig, id: string): string[] | undefined {
   const modalities = modelRecordValue(prov.modelInputModalities, id);
   return Array.isArray(modalities) && modalities.length > 0 ? [...modalities] : undefined;
@@ -1102,6 +1111,7 @@ function configuredMaxInputTokens(prov: OcxProviderConfig, id: string): number |
 export function applyProviderConfigHints(name: string, prov: OcxProviderConfig, model: CatalogModel, providerCap?: number): CatalogModel {
   void name;
   const configuredCap = configuredContextWindow(prov, model.id);
+  const displayName = configuredDisplayName(prov, model.id);
   const configuredMaxInput = configuredMaxInputTokens(prov, model.id);
   let inputModalities = configuredInputModalities(prov, model.id);
   // Vision-sidecar coverage: `noVisionModels` marks models whose images the PROXY describes
@@ -1116,6 +1126,8 @@ export function applyProviderConfigHints(name: string, prov: OcxProviderConfig, 
   const defaultReasoningEffort = modelRecordValue(prov.modelDefaultReasoningEfforts, model.id) ?? model.defaultReasoningEffort;
   const hinted = {
     ...model,
+    // Config is authoritative so removing a mapping also clears a cached label.
+    displayName,
     ...(configuredCap !== undefined
       ? {
         contextWindow: typeof model.contextWindow === "number" && model.contextWindow > 0

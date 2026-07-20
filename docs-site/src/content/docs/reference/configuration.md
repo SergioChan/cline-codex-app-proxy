@@ -151,6 +151,7 @@ network. Only do this on trusted networks, and always set a strong `OPENCODEX_AP
 | `defaultModel?` | `string` | Model used when this provider is selected without an explicit model. |
 | `models?` | `string[]` | Seed/fallback model list. When `liveModels` is `false`, these are the only discovered models. |
 | `liveModels?` | `boolean` | Fetch the provider's live `/models` catalog on start/sync (default `true`). Set `false` to use only configured `models`. |
+| `modelDisplayNames?` | `Record<string,string>` | Model-specific labels shown in the Codex picker. Keys are upstream model ids; routed slugs and upstream request model ids do not change. |
 | `selectedModels?` | `string[]` | Catalog allowlist applied after discovery. A non-empty list exposes only those ids to Codex; empty/omitted exposes all discovered models. |
 | `contextWindow?` | `number` | Provider-wide Codex-visible context-window cap for routed catalog entries. Live metadata below this value is kept. |
 | `modelContextWindows?` | `Record<string,number>` | Model-specific context-window caps. These override `contextWindow` for matching model ids and never raise smaller live metadata. |

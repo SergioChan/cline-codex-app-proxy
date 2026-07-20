@@ -207,3 +207,24 @@ If a provider speaks Chat Completions, the `openai-chat` adapter handles it — 
 dashboard or `custom` in `ocx init` and enter the base URL. See the
 [Configuration reference](/opencodex/reference/configuration/) for every provider field
 (`headers`, `noReasoningModels`, `noVisionModels`, `models`, …).
+
+Use `modelDisplayNames` when an upstream model id is useful for routing but too verbose for the
+Codex picker. The mapping changes only the catalog label; the routed slug and the model id sent
+upstream remain unchanged:
+
+```json
+{
+  "providers": {
+    "cline": {
+      "adapter": "openai-chat",
+      "baseUrl": "https://api.example.com/v1",
+      "models": ["cline-pass/kimi-k3", "cline-pass/glm-5.2"],
+      "liveModels": false,
+      "modelDisplayNames": {
+        "cline-pass/kimi-k3": "Kimi K3",
+        "cline-pass/glm-5.2": "GLM 5.2"
+      }
+    }
+  }
+}
+```

@@ -11,6 +11,7 @@ import {
   isValidProviderName,
   isOcxStartCommandLine,
   loadConfig,
+  nonBlankStringRecordConfigError,
   parsePidFile,
   positiveIntegerRecordConfigError,
   readConfigDiagnostics,
@@ -367,6 +368,36 @@ describe("opencodex config defaults", () => {
     });
     expect(readConfigDiagnostics().source).toBe("fallback");
     expect(readConfigDiagnostics().error).toContain("providers.custom.modelMaxInputTokens");
+  });
+
+  test("modelDisplayNames accepts only plain records with nonblank ids and labels", () => {
+    expect(nonBlankStringRecordConfigError(
+      { "cline-pass/kimi-k3": "Kimi K3" },
+      "modelDisplayNames",
+    )).toBeNull();
+    expect(nonBlankStringRecordConfigError(
+      Object.create({ inherited: "label" }),
+      "modelDisplayNames",
+    )).toContain("own properties");
+    for (const invalid of [null, [], { "": "label" }, { model: "" }, { model: "   " }, { model: 3 }]) {
+      expect(nonBlankStringRecordConfigError(invalid, "modelDisplayNames")).not.toBeNull();
+    }
+  });
+
+  test("disk config rejects malformed modelDisplayNames", () => {
+    writeConfig({
+      port: 10100,
+      providers: {
+        custom: {
+          adapter: "openai-chat",
+          baseUrl: "https://example.test/v1",
+          modelDisplayNames: { model: "   " },
+        },
+      },
+      defaultProvider: "custom",
+    });
+    expect(readConfigDiagnostics().source).toBe("fallback");
+    expect(readConfigDiagnostics().error).toContain("providers.custom.modelDisplayNames");
   });
 
   test("disk config rejects forged registry-only virtual model maps", () => {
