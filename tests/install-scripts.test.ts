@@ -70,10 +70,11 @@ describe("install scripts", () => {
     const script = await readText("scripts/install.sh");
 
     expect(script).toContain("Node.js 18+ is required");
-    expect(script).toContain("npm install -g @bitkyc08/opencodex");
+    expect(script).toContain("npm install -g .");
+    expect(script).toContain("npm run build:gui");
     expect(script).toContain("command -v ocx");
     expect(script).toContain("ocx help");
-    expect(script).not.toContain("bun install -g @bitkyc08/opencodex");
+    expect(script).not.toContain("@bitkyc08/opencodex");
     expect(script).not.toContain("bun.sh/install");
   });
 
@@ -81,33 +82,22 @@ describe("install scripts", () => {
     const script = await readText("scripts/install.ps1");
 
     expect(script).toContain("Node.js 18+ is required");
-    expect(script).toContain("& $npm.Source install -g @bitkyc08/opencodex");
+    expect(script).toContain("& $npm.Source install -g .");
+    expect(script).toContain("& $npm.Source run build:gui");
     expect(script).toContain("$LASTEXITCODE");
     expect(script).toContain("Get-Command ocx.cmd");
     expect(script).toContain("Get-Command ocx");
     expect(script).toContain("& $ocx.Source help");
-    expect(script).not.toContain("bun install -g @bitkyc08/opencodex");
+    expect(script).not.toContain("@bitkyc08/opencodex");
     expect(script).not.toContain("bun.sh/install.ps1");
   });
 
-  test("Node launcher handles npm self-update before starting Bun", async () => {
+  test("Node launcher sends updates to the source workflow", async () => {
     const launcher = await readText("bin/ocx.mjs");
 
     expect(launcher).toContain('process.argv[2] === "update"');
-    expect(launcher).toContain('["install", "-g", `${PKG}@${tag}`]');
-    expect(launcher).toContain('return String(currentVersion).includes("-preview.") ? "preview" : "latest"');
-    expect(launcher).toContain("!isBunGlobalInstall()");
-    expect(launcher).toContain("repairCodexShimIfNeeded()");
-    expect(launcher).toContain("runNpmSelfUpdate()");
+    expect(launcher).toContain("This fork is not published to npm");
+    expect(launcher).toContain("npm install -g .");
   });
 
-  test("release helper watches the workflow run it just dispatched", async () => {
-    const script = await readText("scripts/release.ts");
-
-    expect(script).toContain("waitForReleaseWorkflowRun");
-    expect(script).toContain("gh run list --workflow release.yml --branch");
-    expect(script).toContain("--commit");
-    expect(script).toContain("createdAt,databaseId,headSha,status,url");
-    expect(script).toContain("await watchRun(releaseRun.databaseId)");
-  });
 });

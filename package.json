@@ -1,7 +1,7 @@
 {
-  "name": "@bitkyc08/opencodex",
-  "version": "2.7.28",
-  "description": "Universal provider proxy for OpenAI Codex & Claude Code — use any LLM with Codex CLI/App/SDK and Claude Code",
+  "name": "cline-codex-app-proxy",
+  "version": "0.1.0",
+  "description": "Use Cline Coding Plan Kimi and GLM models in the macOS Codex desktop App",
   "type": "module",
   "main": "./bin/package-main.mjs",
   "exports": {
@@ -12,6 +12,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
+    "cline-codex-app-proxy": "./bin/ocx.mjs",
     "opencodex": "./bin/ocx.mjs",
     "ocx": "./bin/ocx.mjs"
   },
@@ -23,6 +24,7 @@
     "assets/architecture.png",
     "assets/codex-app-picker.png",
     "README.md",
+    "NOTICE.md",
     "LICENSE"
   ],
   "engines": {
@@ -44,8 +46,6 @@
     "prepare:package": "bun scripts/prepare-package.ts",
     "prepack": "bun run prepare:package",
     "prepublishOnly": "bun run typecheck && bun run build:gui",
-    "release": "bun scripts/release.ts",
-    "release:watch": "bun scripts/release.ts watch",
     "prepush": "bun run typecheck && bun run lint:gui && bun run test && bun run privacy:scan && bun run doctor:gui:if-changed",
     "lint:gui": "cd gui && bun run lint",
     "doctor:gui": "cd gui && bun run doctor",
@@ -65,15 +65,18 @@
   },
   "keywords": [
     "codex",
+    "codex-app",
+    "cline",
+    "clinepass",
+    "kimi",
+    "glm",
     "openai",
     "proxy",
     "llm",
     "ollama",
     "anthropic",
     "responses-api",
-    "claude-code",
-    "claude",
-    "codex-cli",
+    "macos",
     "gemini",
     "grok",
     "deepseek",
@@ -84,11 +87,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lidge-jun/opencodex.git"
+    "url": "git+https://github.com/SergioChan/cline-codex-app-proxy.git"
   },
-  "homepage": "https://lidge-jun.github.io/opencodex/",
+  "homepage": "https://github.com/SergioChan/cline-codex-app-proxy#readme",
   "bugs": {
-    "url": "https://github.com/lidge-jun/opencodex/issues"
+    "url": "https://github.com/SergioChan/cline-codex-app-proxy/issues"
   },
   "license": "MIT"
 }

@@ -57,8 +57,8 @@ body:
     id: version
     attributes:
       label: Version
-      description: The installed `@bitkyc08/opencodex` version or commit SHA.
-      placeholder: 2.7.7
+      description: The installed `cline-codex-app-proxy` version or commit SHA.
+      placeholder: 0.1.0
 
   - type: input
     id: os

@@ -18,7 +18,8 @@ export function historyRestoreIncomplete(configDir = getConfigDir()): boolean {
   }
 }
 
-export const PKG = "@bitkyc08/opencodex";
+export const PKG = "cline-codex-app-proxy";
+export const REGISTRY_UPDATES_ENABLED = false;
 const HERE = dirname(fileURLToPath(import.meta.url)); // .../opencodex/src/update
 
 export type Installer = "bun" | "npm" | "source";
@@ -78,6 +79,7 @@ function logSpawnOutput(label: string, result: { stdout?: string | Buffer | null
 
 /** Latest published version from the registry (best-effort; null if npm isn't available). */
 export function latestVersion(tag: string): string | null {
+  if (!REGISTRY_UPDATES_ENABLED) return null;
   const npm = npmSpawnTarget("npm");
   const r = spawnSync(npm.bin, ["view", `${PKG}@${tag}`, "version"], { encoding: "utf8", timeout: 12000, windowsHide: true, shell: npm.shell });
   return r.status === 0 ? (r.stdout.trim() || null) : null;
@@ -134,6 +136,10 @@ export function checkUpdatePackageIntegrity(
  * in the Node bin launcher before Bun starts, so Windows does not replace the running Bun binary.
  */
 export async function runUpdate(): Promise<void> {
+  if (!REGISTRY_UPDATES_ENABLED) {
+    console.log("This fork is not published to npm. Update from its Git checkout: git pull && npm install && npm run build:gui && npm install -g .");
+    return;
+  }
   const installer = detectInstall();
   const current = currentVersion();
   const tag = updateTag(current);

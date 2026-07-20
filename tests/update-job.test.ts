@@ -156,7 +156,7 @@ describe("GUI update execution decisions", () => {
       installer: "npm",
       restart: true,
       command: "node /pkg/bin/ocx.mjs update --tag latest",
-      releaseNotesUrl: "https://github.com/lidge-jun/opencodex/releases/latest",
+      releaseNotesUrl: "https://github.com/SergioChan/cline-codex-app-proxy/releases/latest",
       log: [],
     };
     writeFileSync(updateJobPath(), `${JSON.stringify(job)}\n`);
@@ -167,17 +167,17 @@ describe("GUI update execution decisions", () => {
 
 describe("immutable update target (WP160)", () => {
   test("a resolved version pins the install target instead of the movable tag", () => {
-    expect(updateCommand("bun", "latest", "2.7.24").args).toEqual(["add", "-g", "@bitkyc08/opencodex@2.7.24"]);
-    expect(updateCommand("npm", "latest", "2.7.24").args).toEqual(["install", "-g", "@bitkyc08/opencodex@2.7.24"]);
-    expect(updateCommandStr("bun", "latest", "2.7.24")).toContain("@bitkyc08/opencodex@2.7.24");
+    expect(updateCommand("bun", "latest", "2.7.24").args).toEqual(["add", "-g", "cline-codex-app-proxy@2.7.24"]);
+    expect(updateCommand("npm", "latest", "2.7.24").args).toEqual(["install", "-g", "cline-codex-app-proxy@2.7.24"]);
+    expect(updateCommandStr("bun", "latest", "2.7.24")).toContain("cline-codex-app-proxy@2.7.24");
     // Unknown version falls back to the tag (best-effort lane).
-    expect(updateCommand("bun", "latest").args).toEqual(["add", "-g", "@bitkyc08/opencodex@latest"]);
-    expect(updateCommand("bun", "latest", null).args).toEqual(["add", "-g", "@bitkyc08/opencodex@latest"]);
+    expect(updateCommand("bun", "latest").args).toEqual(["add", "-g", "cline-codex-app-proxy@latest"]);
+    expect(updateCommand("bun", "latest", null).args).toEqual(["add", "-g", "cline-codex-app-proxy@latest"]);
   });
 
   test("bun worker execution pins the resolved version through updateExecutionCommand", () => {
     const cmd = updateExecutionCommand("bun", "latest", "/pkg/bin/ocx.mjs", "2.7.24");
-    expect(cmd.args).toEqual(["add", "-g", "@bitkyc08/opencodex@2.7.24"]);
+    expect(cmd.args).toEqual(["add", "-g", "cline-codex-app-proxy@2.7.24"]);
     expect(cmd.display).toContain("@2.7.24");
   });
 

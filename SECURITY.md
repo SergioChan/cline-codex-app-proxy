@@ -2,16 +2,16 @@
 
 ## Supported Versions
 
-opencodex accepts security fixes on a best-effort basis for these lines:
+cline-codex-app-proxy accepts security fixes on a best-effort basis for these lines:
 
 | Version | Supported |
 | --- | --- |
 | `main` | ✅ |
-| Latest published npm release | ✅ |
+| Latest tagged GitHub release | ✅ |
 | Older releases | ❌ |
 
 If you report an issue against an older release, maintainers may ask you to reproduce it on `main`
-or the latest published package before triage continues.
+or the latest tagged source release before triage continues.
 
 ## Reporting a Vulnerability
 

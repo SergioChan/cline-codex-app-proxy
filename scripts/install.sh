@@ -1,43 +1,33 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "Installing opencodex..."
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if ! command -v node &>/dev/null; then
+if ! command -v node >/dev/null 2>&1; then
   echo "Node.js 18+ is required. Install Node from https://nodejs.org/ and rerun this script." >&2
   exit 1
 fi
 
-NODE_MAJOR=$(node -p "Number(process.versions.node.split('.')[0])")
+NODE_MAJOR="$(node -p "Number(process.versions.node.split('.')[0])")"
 if [ "$NODE_MAJOR" -lt 18 ]; then
   echo "Node.js 18+ is required. Current version: $(node --version)" >&2
   exit 1
 fi
 
-if ! command -v npm &>/dev/null; then
-  echo "npm is required to install the published opencodex package." >&2
+if ! command -v npm >/dev/null 2>&1; then
+  echo "npm is required for the source installation." >&2
   exit 1
 fi
 
-echo "Using Node $(node --version)"
+cd "$ROOT"
+npm install
+npm run build:gui
+npm install -g .
 
-# Install opencodex globally
-# If npm reports "install scripts blocked" for bun, rerun as:
-#   npm install -g --allow-scripts=bun @bitkyc08/opencodex
-# (keep sudo if the original install used sudo)
-npm install -g @bitkyc08/opencodex
-
-if ! command -v ocx &>/dev/null; then
-  NPM_BIN="$(npm bin -g 2>/dev/null || printf "%s/bin" "$(npm prefix -g)")"
-  echo "opencodex installed, but 'ocx' is not on PATH." >&2
-  echo "Add your npm global bin directory to PATH, then rerun your shell: $NPM_BIN" >&2
+if ! command -v ocx >/dev/null 2>&1 || ! ocx help >/dev/null; then
+  echo "The package was installed, but 'ocx' is unavailable. Check your npm global PATH." >&2
   exit 1
 fi
 
-if ! ocx help >/dev/null; then
-  echo "opencodex installed, but 'ocx help' failed. Check your npm global install and PATH." >&2
-  exit 1
-fi
-
-echo ""
-echo "✅ opencodex installed! Run 'ocx init' to set up."
+echo "Installed cline-codex-app-proxy from $ROOT"
+echo "Next: ocx cline setup"

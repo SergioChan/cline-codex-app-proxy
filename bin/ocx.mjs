@@ -3,177 +3,20 @@
  * opencodex npm bin launcher.
  *
  * The package source is TypeScript that runs on the Bun runtime. To let
- * `npm install -g @bitkyc08/opencodex` work without a separately-installed Bun,
+ * `npm install -g .` work without a separately-installed Bun,
  * we bundle the runtime via the `bun` npm dependency and exec it from this
  * Node shim. (Dev still runs `bun run src/cli/index.ts` directly via the shebang on
  * src/cli/index.ts — only the published npm `bin` routes through here.)
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const PKG = "@bitkyc08/opencodex";
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const cliPath = join(here, "..", "src", "cli", "index.ts");
-
-function isNodeModulesInstall() {
-  return here.split(/[\\/]/).includes("node_modules");
-}
-
-function isBunGlobalInstall() {
-  return /[\\/]\.bun[\\/]/.test(here);
-}
-
-function npmBin() {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
-}
-
-function currentPackageVersion() {
-  try {
-    return JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8")).version ?? "?";
-  } catch {
-    return "?";
-  }
-}
-
-function updateTag(currentVersion) {
-  // Allowlist the tag: the value is argv-controlled and (on Windows) flows into a
-  // shell-joined spawnSync — never forward arbitrary strings.
-  const tagIndex = process.argv.indexOf("--tag");
-  const explicit = tagIndex !== -1 ? process.argv[tagIndex + 1] : undefined;
-  if (explicit === "preview" || explicit === "latest") return explicit;
-  return String(currentVersion).includes("-preview.") ? "preview" : "latest";
-}
-
-function expandUserPath(raw) {
-  // Mirror src/config.ts expandUserPath — the Bun proxy expands `~`, so this launcher's
-  // pid/state gates must resolve the same directory or they silently check the wrong path.
-  if (raw === "~") return homedir();
-  if (raw.startsWith("~/") || raw.startsWith("~\\")) return join(homedir(), raw.slice(2));
-  return raw;
-}
-
-function configDir() {
-  const raw = process.env.OPENCODEX_HOME?.trim();
-  return resolve(raw ? expandUserPath(raw) : join(homedir(), ".opencodex"));
-}
-
-function shouldRepairCodexShim() {
-  return existsSync(join(configDir(), "codex-shim.json"));
-}
-
-function historyRestoreIncomplete() {
-  // Mirror src/update/index.ts historyRestoreIncomplete — a codex-history-backup-*.json surviving
-  // a stop means the native-history restore was skipped (locked state DB).
-  try {
-    return readdirSync(configDir()).some(
-      name => name.startsWith("codex-history-backup-") && name.endsWith(".json"),
-    );
-  } catch {
-    return false;
-  }
-}
-
-function repairCodexShimIfNeeded() {
-  if (!shouldRepairCodexShim()) return;
-  const launcher = fileURLToPath(import.meta.url);
-  const res = spawnSync(process.execPath, [launcher, "codex-shim", "install"], {
-    stdio: "inherit",
-    windowsHide: true,
-  });
-  if (res.status !== 0) {
-    console.warn(`opencodex: Codex shim repair failed (${res.status ?? "unknown exit"}). Try: ocx codex-shim install`);
-  }
-}
-
-function runNpmSelfUpdate() {
-  const current = currentPackageVersion();
-  const tag = updateTag(current);
-  const npm = npmBin();
-  // Node ≥18.20/20.12 refuses to spawn .cmd/.bat without a shell (CVE-2024-27980
-  // hardening) — spawning "npm.cmd" shell-less throws EINVAL on Windows.
-  const winShell = process.platform === "win32";
-  const latestResult = spawnSync(npm, ["view", `${PKG}@${tag}`, "version"], {
-    encoding: "utf8",
-    timeout: 12000,
-    windowsHide: true,
-    shell: winShell,
-  });
-  const latest = latestResult.status === 0 ? latestResult.stdout.trim() : "";
-
-  console.log(`opencodex v${current} (installed via npm, tag ${tag})`);
-  if (latest && latest === current) {
-    console.log(`Already on the latest ${tag} version (v${latest}).`);
-    process.exit(0);
-  }
-
-  // Remember whether a background service manages the proxy BEFORE stopping — `ocx stop`
-  // unloads it permanently, so a successful update must reinstall it afterwards.
-  const serviceStatePath = join(configDir(), "service-state.json");
-  const serviceWasInstalled = existsSync(serviceStatePath);
-  /** Read the backend from service-state.json so the update reinstalls the same one. */
-  function serviceReinstallArgs() {
-    try {
-      const state = JSON.parse(readFileSync(serviceStatePath, "utf8"));
-      if (state.backend === "native") return [launcher, "service", "install", "--native"];
-    } catch { /* missing or corrupt — fall through to default */ }
-    return [launcher, "service", "install"];
-  }
-
-  // Never replace package files under a live proxy — stop it first (full `ocx stop`
-  // semantics: graceful drain, service stop, native Codex restore). Gate on the service
-  // and the runtime-port record too: a service-managed or orphaned proxy can be live
-  // while ocx.pid is stale/missing.
-  const launcher = fileURLToPath(import.meta.url);
-  const hasRuntimeState =
-    existsSync(join(configDir(), "ocx.pid")) || existsSync(join(configDir(), "runtime-port.json"));
-  if (serviceWasInstalled || hasRuntimeState) {
-    console.log("⏹  Stopping the running proxy before updating...");
-    const stopRes = spawnSync(process.execPath, [launcher, "stop"], { stdio: "inherit", windowsHide: true });
-    const stillHasRuntimeState =
-      existsSync(join(configDir(), "ocx.pid")) || existsSync(join(configDir(), "runtime-port.json"));
-    if (stopRes.status !== 0 || stillHasRuntimeState) {
-      console.error("opencodex: could not stop the running proxy; aborting the update. Run 'ocx stop' and retry.");
-      process.exit(1);
-    }
-    if (historyRestoreIncomplete()) {
-      console.warn(
-        "opencodex: WARNING — Codex resume history was NOT restored (history DB locked; Codex app/IDE open?).\n" +
-        "  Routed threads stay hidden in the native Codex app until restored.\n" +
-        "  After the update: close the Codex app, then run 'ocx stop' once to restore.",
-      );
-    }
-  }
-
-  console.log(`Updating${latest ? ` to v${latest}` : ""}...\n$ ${npm} install -g ${PKG}@${tag}`);
-  const res = spawnSync(npm, ["install", "-g", `${PKG}@${tag}`], {
-    stdio: "inherit",
-    timeout: 180000,
-    windowsHide: true,
-    shell: winShell,
-  });
-  if (res.status === 0) {
-    console.log(`\nUpdated${latest ? ` to v${latest}` : ""}.`);
-    repairCodexShimIfNeeded();
-    // The stop above unloaded any managed service; reinstall via the freshly-installed
-    // launcher so the new files write the baked paths and the service restarts.
-    if (serviceWasInstalled) {
-      console.log("Reinstalling the background service with the updated files...");
-      const svcArgs = serviceReinstallArgs();
-      const svc = spawnSync(process.execPath, svcArgs, { stdio: "inherit", windowsHide: true });
-      if (svc.status !== 0) console.warn("opencodex: service refresh failed — run 'ocx service install' manually.");
-    } else {
-      console.log("Restart the proxy:  ocx start");
-    }
-    process.exit(0);
-  }
-  console.error(`\nUpdate failed (${npm} exit ${res.status ?? "?"}). Try manually:  ${npm} install -g ${PKG}@${tag}`);
-  process.exit(1);
-}
 
 function bunBinDir() {
   // Resolve the `bun` dependency's directory without hardcoding the platform
@@ -203,7 +46,7 @@ function fail(msg) {
       "The bundled Bun runtime could not be prepared. This usually means the\n" +
       "install skipped lifecycle scripts (e.g. npm blocked bun's postinstall\n" +
       "under allowScripts) or optional dependencies. Reinstall with:\n" +
-      "  npm install -g --allow-scripts=bun @bitkyc08/opencodex\n" +
+      "  npm install -g --allow-scripts=bun .\n" +
       "(use sudo if the original install used sudo; without --ignore-scripts\n" +
       "and without --omit=optional / optional=false)"
   );
@@ -239,12 +82,13 @@ function resolveBun() {
 const updateHelpRequested = process.argv[2] === "update" &&
   process.argv.slice(3).some(a => a === "--help" || a === "-h" || a === "help");
 if (updateHelpRequested) {
-  console.log("Usage: ocx update [--tag latest|preview]\n\nUpdate opencodex. Preview installs stay on the preview tag unless overridden.");
+  console.log("Usage: ocx update\n\nThis source-distributed fork is updated with git pull, npm install, and npm install -g .");
   process.exit(0);
 }
 
-if (process.argv[2] === "update" && isNodeModulesInstall() && !isBunGlobalInstall()) {
-  runNpmSelfUpdate();
+if (process.argv[2] === "update") {
+  console.log("This fork is not published to npm. Update from its Git checkout:\n  git pull\n  npm install\n  npm run build:gui\n  npm install -g .");
+  process.exit(0);
 }
 
 const bun = resolveBun();

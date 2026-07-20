@@ -67,8 +67,8 @@ const helpEntries: Record<string, HelpEntry> = {
   logout: { usage: "ocx logout <provider>", summary: "Remove a stored provider login." },
   gui: { usage: "ocx gui", summary: "Open the opencodex dashboard." },
   update: {
-    usage: "ocx update [--tag latest|preview]",
-    summary: "Update opencodex. Preview installs stay on the preview tag unless overridden.",
+    usage: "ocx update",
+    summary: "Show source-update instructions for this fork.",
   },
   provider: {
     usage: "ocx provider <list|add|remove|show|set-default>",
@@ -121,11 +121,11 @@ function packageVersion(): string {
 }
 
 export function printVersion(): void {
-  console.log(`opencodex ${packageVersion()}`);
+  console.log(`cline-codex-app-proxy ${packageVersion()}`);
 }
 
 export function printUsage(): void {
-  console.log(`opencodex (ocx) — Universal provider proxy for Codex
+  console.log(`cline-codex-app-proxy (ocx) — Cline models for the Codex desktop App
 
 Usage:
   ocx init                    Interactive setup (provider + Codex config injection)
@@ -148,7 +148,7 @@ Usage:
   ocx login <provider>        OAuth login (xai) — opens browser, stores token in ~/.opencodex/auth.json
   ocx logout <provider>       Remove a stored OAuth login
   ocx gui                     Open the opencodex dashboard
-  ocx update [--tag <tag>]    Update opencodex (keeps preview installs on @preview)
+  ocx update                  Show source-update instructions for this fork
   ocx restart                  Stop and restart the proxy
   ocx health [--json]          Check proxy health (exit 0=healthy, 1=not)
   ocx provider <sub>          Manage providers (list|add|remove|show|set-default)
