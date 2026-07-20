@@ -23,7 +23,7 @@ try {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $npm.Source run build:gui
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    & $npm.Source install -g .
+    & $npm.Source run "install:global"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 } finally {
     Pop-Location

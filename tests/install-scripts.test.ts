@@ -35,6 +35,7 @@ describe("install scripts", () => {
     expect(pkg.scripts?.["dev:proxy"]).toBe("bun run src/cli/index.ts start");
     expect(pkg.scripts?.["dev:gui"]).toBe("cd gui && bun run dev");
     expect(pkg.scripts?.["prepare:package"]).toBe("bun scripts/prepare-package.ts");
+    expect(pkg.scripts?.["install:global"]).toBe("node scripts/install-global.mjs");
     expect(pkg.scripts?.prepack).toBe("bun run prepare:package");
     expect(pkg.files).toContain("assets/banner.png");
     expect(pkg.files).toContain("assets/architecture.png");
@@ -70,7 +71,7 @@ describe("install scripts", () => {
     const script = await readText("scripts/install.sh");
 
     expect(script).toContain("Node.js 18+ is required");
-    expect(script).toContain("npm install -g .");
+    expect(script).toContain("npm run install:global");
     expect(script).toContain("npm run build:gui");
     expect(script).toContain("command -v ocx");
     expect(script).toContain("ocx help");
@@ -82,7 +83,7 @@ describe("install scripts", () => {
     const script = await readText("scripts/install.ps1");
 
     expect(script).toContain("Node.js 18+ is required");
-    expect(script).toContain("& $npm.Source install -g .");
+    expect(script).toContain('& $npm.Source run "install:global"');
     expect(script).toContain("& $npm.Source run build:gui");
     expect(script).toContain("$LASTEXITCODE");
     expect(script).toContain("Get-Command ocx.cmd");
@@ -97,7 +98,16 @@ describe("install scripts", () => {
 
     expect(launcher).toContain('process.argv[2] === "update"');
     expect(launcher).toContain("This fork is not published to npm");
-    expect(launcher).toContain("npm install -g .");
+    expect(launcher).toContain("npm run install:global");
+  });
+
+  test("durable global installer packs before installing", async () => {
+    const script = await readText("scripts/install-global.mjs");
+
+    expect(script).toContain('mkdtempSync(join(tmpdir(), "cline-codex-app-proxy-")');
+    expect(script).toContain('["pack", "--silent", "--pack-destination", packDir]');
+    expect(script).toContain('["install", "-g", tarball]');
+    expect(script).toContain("rmSync(packDir, { recursive: true, force: true })");
   });
 
 });

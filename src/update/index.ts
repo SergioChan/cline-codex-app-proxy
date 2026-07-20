@@ -137,7 +137,7 @@ export function checkUpdatePackageIntegrity(
  */
 export async function runUpdate(): Promise<void> {
   if (!REGISTRY_UPDATES_ENABLED) {
-    console.log("This fork is not published to npm. Update from its Git checkout: git pull && npm install && npm run build:gui && npm install -g .");
+    console.log("This fork is not published to npm. Update from its Git checkout: git pull && npm install && npm run build:gui && npm run install:global");
     return;
   }
   const installer = detectInstall();

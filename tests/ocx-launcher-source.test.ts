@@ -12,7 +12,7 @@ describe("ocx.mjs source-distributed launcher", () => {
     expect(updateAt).toBeGreaterThan(-1);
     expect(resolveAt).toBeGreaterThan(updateAt);
     expect(source).toContain("git pull");
-    expect(source).toContain("npm install -g .");
+    expect(source).toContain("npm run install:global");
   });
 
   test("contains no npm registry self-update path", () => {

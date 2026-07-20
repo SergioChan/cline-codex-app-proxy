@@ -43,6 +43,7 @@
     "privacy:scan": "bun scripts/privacy-scan.ts",
     "generate:jawcode-metadata": "bun scripts/generate-jawcode-metadata.ts",
     "build:gui": "cd gui && bun install --frozen-lockfile && bun run build && cd .. && bun run prepare:package",
+    "install:global": "node scripts/install-global.mjs",
     "prepare:package": "bun scripts/prepare-package.ts",
     "prepack": "bun run prepare:package",
     "prepublishOnly": "bun run typecheck && bun run build:gui",

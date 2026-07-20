@@ -58,7 +58,7 @@ git clone https://github.com/SergioChan/cline-codex-app-proxy.git
 cd cline-codex-app-proxy
 npm install
 npm run build:gui
-npm install -g .
+npm run install:global
 ```
 
 Confirm that the installed command is this fork:
@@ -265,7 +265,7 @@ This fork is source-distributed. Update it from the checkout:
 git pull
 npm install
 npm run build:gui
-npm install -g .
+npm run install:global
 ocx service install
 ocx sync
 ```

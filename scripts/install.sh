@@ -22,7 +22,7 @@ fi
 cd "$ROOT"
 npm install
 npm run build:gui
-npm install -g .
+npm run install:global
 
 if ! command -v ocx >/dev/null 2>&1 || ! ocx help >/dev/null; then
   echo "The package was installed, but 'ocx' is unavailable. Check your npm global PATH." >&2

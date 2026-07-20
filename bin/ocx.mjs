@@ -3,7 +3,7 @@
  * opencodex npm bin launcher.
  *
  * The package source is TypeScript that runs on the Bun runtime. To let
- * `npm install -g .` work without a separately-installed Bun,
+ * global tarball installs work without a separately-installed Bun,
  * we bundle the runtime via the `bun` npm dependency and exec it from this
  * Node shim. (Dev still runs `bun run src/cli/index.ts` directly via the shebang on
  * src/cli/index.ts — only the published npm `bin` routes through here.)
@@ -82,12 +82,12 @@ function resolveBun() {
 const updateHelpRequested = process.argv[2] === "update" &&
   process.argv.slice(3).some(a => a === "--help" || a === "-h" || a === "help");
 if (updateHelpRequested) {
-  console.log("Usage: ocx update\n\nThis source-distributed fork is updated with git pull, npm install, and npm install -g .");
+  console.log("Usage: ocx update\n\nThis source-distributed fork is updated with git pull, npm install, npm run build:gui, and npm run install:global.");
   process.exit(0);
 }
 
 if (process.argv[2] === "update") {
-  console.log("This fork is not published to npm. Update from its Git checkout:\n  git pull\n  npm install\n  npm run build:gui\n  npm install -g .");
+  console.log("This fork is not published to npm. Update from its Git checkout:\n  git pull\n  npm install\n  npm run build:gui\n  npm run install:global");
   process.exit(0);
 }
 
