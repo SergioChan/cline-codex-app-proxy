@@ -59,8 +59,10 @@ describe("ocx cline", () => {
       expect(configured.websockets).toBe(true);
       expect(configured.subagentModels).toEqual(["custom/model"]);
       expect(configured.providers.cline.apiKey).toBe("super-secret-key");
-      expect(statSync(configPath).mode & 0o777).toBe(0o600);
-      expect(statSync(statePath).mode & 0o777).toBe(0o600);
+      if (process.platform !== "win32") {
+        expect(statSync(configPath).mode & 0o777).toBe(0o600);
+        expect(statSync(statePath).mode & 0o777).toBe(0o600);
+      }
 
       const remove = runCli(["cline", "remove", "--json"], home);
       expect(remove.status).toBe(0);
@@ -91,7 +93,7 @@ describe("ocx cline", () => {
     }
   });
 
-  test("API key files must be private", () => {
+  test.skipIf(process.platform === "win32")("POSIX API key files must be private", () => {
     const home = mkdtempSync(join(tmpdir(), "ocx-cline-key-file-"));
     const configPath = join(home, "config.json");
     const keyPath = join(home, "cline.key");

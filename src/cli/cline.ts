@@ -101,10 +101,11 @@ function consumeFlagValue(args: string[], flag: string): string | undefined {
   return value;
 }
 
-async function readAllStdin(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
-  return Buffer.concat(chunks).toString("utf8").trim();
+function readAllStdin(): string {
+  // `spawnSync(..., { input })` can present an already-buffered, EOF-terminated fd 0
+  // that Bun's async stdin iterator misses on Linux. This option is explicitly a
+  // one-shot pipe, so a synchronous read is both portable and the intended contract.
+  return readFileSync(0, "utf8").trim();
 }
 
 async function readHiddenSecret(prompt: string): Promise<string> {
