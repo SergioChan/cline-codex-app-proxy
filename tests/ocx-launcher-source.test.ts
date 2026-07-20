@@ -2,24 +2,22 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-/**
- * bin/ocx.mjs is the Node bin launcher — it executes top-level logic on import, so it
- * cannot be imported by tests. Guard its Windows-critical invariants at the source level.
- */
+/** bin/ocx.mjs executes top-level logic on import, so guard it at the source level. */
 const source = readFileSync(join(import.meta.dir, "..", "bin", "ocx.mjs"), "utf8");
 
-describe("ocx.mjs npm launcher (source invariants)", () => {
-  test("npm spawns go through a shell on Windows (Node ≥18.20 EINVALs shell-less .cmd spawns)", () => {
-    const spawnSites = source.match(/spawnSync\(npm,[\s\S]*?\}\)/g) ?? [];
-    expect(spawnSites.length).toBe(2);
-    for (const site of spawnSites) {
-      expect(site).toContain("shell: winShell");
-    }
-    expect(source).toContain('const winShell = process.platform === "win32";');
+describe("ocx.mjs source-distributed launcher", () => {
+  test("update exits with source instructions before resolving or launching Bun", () => {
+    const updateAt = source.indexOf('if (process.argv[2] === "update")');
+    const resolveAt = source.indexOf("const bun = resolveBun();");
+    expect(updateAt).toBeGreaterThan(-1);
+    expect(resolveAt).toBeGreaterThan(updateAt);
+    expect(source).toContain("git pull");
+    expect(source).toContain("npm install -g .");
   });
 
-  test("--tag is allowlisted before reaching shell-joined spawn args", () => {
-    expect(source).toContain('if (explicit === "preview" || explicit === "latest") return explicit;');
-    expect(source).not.toMatch(/if \(tagIndex !== -1 && process\.argv\[tagIndex \+ 1\]\) return process\.argv/);
+  test("contains no npm registry self-update path", () => {
+    expect(source).not.toContain("runNpmSelfUpdate");
+    expect(source).not.toContain("npm view");
+    expect(source).not.toContain("serviceReinstallArgs");
   });
 });

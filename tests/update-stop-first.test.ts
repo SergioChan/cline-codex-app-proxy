@@ -7,7 +7,7 @@ const launcherSource = readFileSync(join(import.meta.dir, "..", "bin", "ocx.mjs"
 const serverSource = readFileSync(join(import.meta.dir, "..", "src", "server", "index.ts"), "utf8");
 const cliSource = readFileSync(join(import.meta.dir, "..", "src", "cli", "index.ts"), "utf8");
 
-describe("update stops the running proxy before replacing files", () => {
+describe("registry update safety path", () => {
   test("bun/source update path gates on the pid file and spawns 'stop' before the package manager", () => {
     expect(updateSource).toContain('spawnSync(process.execPath, [process.argv[1], "stop"]');
     const stopAt = updateSource.indexOf('[process.argv[1], "stop"]');
@@ -27,47 +27,22 @@ describe("update stops the running proxy before replacing files", () => {
     expect(abortAt).toBeLessThan(stopAt);
   });
 
-  test("npm launcher update path stops via its own launcher path before npm install", () => {
-    expect(launcherSource).toContain('spawnSync(process.execPath, [launcher, "stop"]');
-    const stopAt = launcherSource.indexOf('[launcher, "stop"]');
-    const installAt = launcherSource.indexOf('spawnSync(npm, ["install", "-g"');
-    expect(stopAt).toBeGreaterThan(-1);
-    expect(stopAt).toBeLessThan(installAt);
-    expect(launcherSource).toContain('existsSync(join(configDir(), "ocx.pid"))');
-    expect(launcherSource).toContain('existsSync(join(configDir(), "runtime-port.json"))');
-  });
-
-  test("both paths abort when the stop fails, and reinstall a managed service after success", () => {
+  test("the dormant registry path aborts when stop fails and reinstalls a managed service after success", () => {
     expect(updateSource).toContain("aborting the update");
-    // The update path now uses serviceReinstallArgs() to preserve the chosen backend.
     expect(updateSource).toContain("serviceReinstallArgs()");
-    expect(launcherSource).toContain("aborting the update");
-    // The launcher reads service-state.json to preserve the backend choice on reinstall.
-    expect(launcherSource).toContain("serviceReinstallArgs");
-    // The launcher reads the state path for both service-installed detection and backend choice.
-    expect(launcherSource).toContain('"service-state.json"');
   });
 
-  test("both update paths surface a skipped history restore after the stop", () => {
+  test("the dormant registry path surfaces a skipped history restore after the stop", () => {
     // A codex-history-backup-*.json surviving `ocx stop` means the native-history restore
     // was skipped (locked state DB) — users must be told or their threads silently stay
     // hidden in the Codex app.
     expect(updateSource).toContain("export function historyRestoreIncomplete(");
     expect(updateSource).toContain('name.startsWith("codex-history-backup-") && name.endsWith(".json")');
     expect(updateSource).toContain("if (historyRestoreIncomplete())");
-    expect(launcherSource).toContain("function historyRestoreIncomplete()");
-    expect(launcherSource).toContain('name.startsWith("codex-history-backup-") && name.endsWith(".json")');
-    expect(launcherSource).toContain("if (historyRestoreIncomplete())");
-    const warnAt = launcherSource.indexOf("Codex resume history was NOT restored");
-    const installAt = launcherSource.indexOf('spawnSync(npm, ["install", "-g"');
-    expect(warnAt).toBeGreaterThan(-1);
-    expect(warnAt).toBeLessThan(installAt);
   });
 
-  test("the stop gate covers service-managed and orphaned proxies whose pid file is stale/missing", () => {
+  test("the dormant registry path covers service-managed and orphaned proxies whose pid file is stale/missing", () => {
     expect(updateSource).toContain("if (serviceWasInstalled || readPid() || readRuntimePort())");
-    expect(launcherSource).toContain("if (serviceWasInstalled || hasRuntimeState)");
-    expect(launcherSource).toContain("stopRes.status !== 0 || stillHasRuntimeState");
   });
 
   test("GUI worker update children use pipe stdio so Windows npm.cmd does not open consoles", () => {
@@ -92,15 +67,15 @@ describe("ocx update --help has no side effects (#168)", () => {
     expect(helpAt).toBeLessThan(runAt);
   });
 
-  test("the npm launcher intercepts update --help before the self-update path", () => {
+  test("the npm launcher intercepts update --help before the source-update notice", () => {
     const helpAt = launcherSource.indexOf("updateHelpRequested");
-    const updateAt = launcherSource.indexOf("runNpmSelfUpdate();");
+    const updateAt = launcherSource.indexOf('if (process.argv[2] === "update")');
+    const bunAt = launcherSource.indexOf("const bun = resolveBun();");
     expect(helpAt).toBeGreaterThan(-1);
     expect(launcherSource).toContain('process.argv[2] === "update" &&');
-    // The guard that CALLS the self-update must come after the help exit.
-    const guardAt = launcherSource.lastIndexOf('process.argv[2] === "update" && isNodeModulesInstall()');
-    expect(helpAt).toBeLessThan(guardAt);
-    expect(updateAt).toBeGreaterThan(guardAt);
+    expect(updateAt).toBeGreaterThan(helpAt);
+    expect(updateAt).toBeLessThan(bunAt);
+    expect(launcherSource).toContain("This fork is not published to npm");
   });
 });
 
