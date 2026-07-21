@@ -45,6 +45,19 @@ describe("CLI subcommand help", () => {
     expect(result.stdout).toContain("Start the proxy server and sync models to Codex.");
   });
 
+  test("Cline help documents model selection and listing", () => {
+    for (const args of [["help", "cline"], ["cline", "--help"], ["cline", "setup", "--help"]]) {
+      const result = runCli(args);
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toContain("Usage: ocx cline <setup|models|status|remove>");
+      expect(result.stdout).toContain("--configure-models");
+      expect(result.stdout).toContain("--model <provider/model>");
+      expect(result.stdout).toContain("--all-clinepass-models");
+      expect(result.stdout).toContain("ocx cline models");
+    }
+  });
+
   test("unknown command with help flag remains an error", () => {
     const result = runCli(["foobar", "--help"]);
     expect(result.status).toBe(1);

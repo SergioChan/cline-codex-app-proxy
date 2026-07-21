@@ -1,7 +1,7 @@
 {
   "name": "cline-codex-app-proxy",
-  "version": "0.1.0",
-  "description": "Use Cline Coding Plan Kimi and GLM models in the macOS Codex desktop App",
+  "version": "0.2.0",
+  "description": "Use configurable ClinePass and Cline API models in the macOS Codex desktop App",
   "type": "module",
   "main": "./bin/package-main.mjs",
   "exports": {
@@ -81,6 +81,8 @@
     "gemini",
     "grok",
     "deepseek",
+    "minimax",
+    "qwen",
     "chatgpt",
     "llm-proxy",
     "ai-gateway",

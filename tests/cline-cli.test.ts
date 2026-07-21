@@ -4,6 +4,8 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CLINEPASS_MODELS, clineProviderFingerprint } from "../src/cline/config";
+import { parseInteractiveModelSelection } from "../src/cli/cline";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const cliPath = join(repoRoot, "src", "cli", "index.ts");
@@ -40,6 +42,19 @@ function baseConfig() {
 }
 
 describe("ocx cline", () => {
+  test("interactive selection accepts official numbers, all, defaults, and custom IDs", () => {
+    expect(parseInteractiveModelSelection("", ["cline-pass/minimax-m3"]))
+      .toBeUndefined();
+    expect(parseInteractiveModelSelection("6, 9", ["cline-pass/kimi-k3"]))
+      .toEqual(["cline-pass/deepseek-v4-flash", "cline-pass/minimax-m3"]);
+    expect(parseInteractiveModelSelection("all", ["cline-pass/kimi-k3"]))
+      .toEqual(CLINEPASS_MODELS.map(model => model.id));
+    expect(parseInteractiveModelSelection("default", ["cline-pass/minimax-m3"]))
+      .toEqual(["cline-pass/kimi-k3", "cline-pass/glm-5.2"]);
+    expect(parseInteractiveModelSelection("deepseek/deepseek-chat", ["cline-pass/kimi-k3"]))
+      .toEqual(["deepseek/deepseek-chat"]);
+  });
+
   test("setup and remove are reversible and never print the key", () => {
     const home = mkdtempSync(join(tmpdir(), "ocx-cline-cli-"));
     const configPath = join(home, "config.json");
@@ -73,6 +88,142 @@ describe("ocx cline", () => {
       expect(restored.codexAutoStart).toBe(original.codexAutoStart);
       expect(restored.websockets).toBe(original.websockets);
       expect(restored.subagentModels).toEqual(original.subagentModels);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("setup accepts repeatable model IDs and key-only reruns preserve the selection", () => {
+    const home = mkdtempSync(join(tmpdir(), "ocx-cline-models-"));
+    const configPath = join(home, "config.json");
+    writeFileSync(configPath, `${JSON.stringify(baseConfig(), null, 2)}\n`, { mode: 0o600 });
+    try {
+      const setup = runCli([
+        "cline", "setup", "--api-key-stdin", "--json",
+        "--model", "cline-pass/deepseek-v4-flash",
+        "--model", "cline-pass/minimax-m3, deepseek/deepseek-chat",
+        "--default-model", "cline-pass/minimax-m3",
+      ], home, "first-secret\n");
+      expect(setup.status).toBe(0);
+      expect(setup.stdout).not.toContain("first-secret");
+      const payload = JSON.parse(setup.stdout);
+      expect(payload.defaultModel).toBe("cline-pass/minimax-m3");
+      expect(payload.models.map((model: { id: string }) => model.id)).toEqual([
+        "cline-pass/deepseek-v4-flash",
+        "cline-pass/minimax-m3",
+        "deepseek/deepseek-chat",
+      ]);
+
+      const configured = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(configured.providers.cline.models).toEqual(payload.models.map((model: { id: string }) => model.id));
+      expect(configured.providers.cline.defaultModel).toBe("cline-pass/minimax-m3");
+      expect(configured.providers.cline.modelDisplayNames["cline-pass/minimax-m3"]).toBe("Cline · MiniMax M3");
+      expect(configured.providers.cline.modelDisplayNames["deepseek/deepseek-chat"]).toBe("Cline · deepseek/deepseek-chat");
+
+      const rotate = runCli(["cline", "setup", "--api-key-stdin", "--json"], home, "second-secret\n");
+      expect(rotate.status).toBe(0);
+      const rotated = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(rotated.providers.cline.apiKey).toBe("second-secret");
+      expect(rotated.providers.cline.models).toEqual(configured.providers.cline.models);
+      expect(rotated.providers.cline.defaultModel).toBe(configured.providers.cline.defaultModel);
+
+      const status = runCli(["cline", "status", "--json"], home);
+      expect(status.status).toBe(0);
+      expect(JSON.parse(status.stdout).models).toHaveLength(3);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("all-model setup and model listing expose the 11-model ClinePass snapshot", () => {
+    const home = mkdtempSync(join(tmpdir(), "ocx-cline-all-models-"));
+    const configPath = join(home, "config.json");
+    writeFileSync(configPath, `${JSON.stringify(baseConfig(), null, 2)}\n`, { mode: 0o600 });
+    try {
+      const before = runCli(["cline", "models", "--json"], home);
+      expect(before.status).toBe(0);
+      expect(JSON.parse(before.stdout).models).toHaveLength(11);
+
+      const setup = runCli([
+        "cline", "setup", "--api-key-stdin", "--all-clinepass-models", "--json",
+      ], home, "secret\n");
+      expect(setup.status).toBe(0);
+      const configured = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(configured.providers.cline.models).toEqual(CLINEPASS_MODELS.map(model => model.id));
+      expect(JSON.parse(setup.stdout).models.every((model: { selected: boolean }) => model.selected)).toBe(true);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("reset and default-only updates preserve the intended managed configuration", () => {
+    const home = mkdtempSync(join(tmpdir(), "ocx-cline-reset-models-"));
+    const configPath = join(home, "config.json");
+    writeFileSync(configPath, `${JSON.stringify(baseConfig(), null, 2)}\n`, { mode: 0o600 });
+    try {
+      const setup = runCli([
+        "cline", "setup", "--api-key-stdin", "--model", "cline-pass/minimax-m3",
+      ], home, "secret\n");
+      expect(setup.status).toBe(0);
+
+      const reset = runCli([
+        "cline", "setup", "--reset-models", "--default-model", "cline-pass/glm-5.2", "--json",
+      ], home);
+      expect(reset.status).toBe(0);
+      const afterReset = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(afterReset.providers.cline.models).toEqual([
+        "cline-pass/kimi-k3",
+        "cline-pass/glm-5.2",
+      ]);
+      expect(afterReset.providers.cline.defaultModel).toBe("cline-pass/glm-5.2");
+
+      afterReset.providers.cline.note = "preserve-this-managed-field";
+      writeFileSync(configPath, `${JSON.stringify(afterReset, null, 2)}\n`, { mode: 0o600 });
+      const statePath = join(home, "cline-codex-app-proxy-state.json");
+      const state = JSON.parse(readFileSync(statePath, "utf8"));
+      state.installedProviderFingerprint = clineProviderFingerprint(afterReset.providers.cline);
+      writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+
+      const defaultOnly = runCli([
+        "cline", "setup", "--default-model", "cline-pass/kimi-k3", "--json",
+      ], home);
+      expect(defaultOnly.status).toBe(0);
+      const afterDefaultOnly = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(afterDefaultOnly.providers.cline).toEqual({
+        ...afterReset.providers.cline,
+        defaultModel: "cline-pass/kimi-k3",
+      });
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("conflicting model sources fail before changing config or state", () => {
+    const home = mkdtempSync(join(tmpdir(), "ocx-cline-model-conflict-"));
+    const configPath = join(home, "config.json");
+    const original = `${JSON.stringify(baseConfig(), null, 2)}\n`;
+    writeFileSync(configPath, original, { mode: 0o600 });
+    try {
+      const result = runCli([
+        "cline", "setup", "--api-key-stdin", "--all-clinepass-models",
+        "--model", "cline-pass/minimax-m3",
+      ], home, "secret\n");
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("Choose only one model source");
+      expect(readFileSync(configPath, "utf8")).toBe(original);
+
+      const interactive = runCli([
+        "cline", "setup", "--api-key-stdin", "--configure-models",
+      ], home, "secret\n");
+      expect(interactive.status).toBe(1);
+      expect(interactive.stderr).toContain("cannot be combined");
+
+      const swallowedFlag = runCli([
+        "cline", "setup", "--api-key-stdin", "--model", "--reset-models",
+      ], home, "secret\n");
+      expect(swallowedFlag.status).toBe(1);
+      expect(swallowedFlag.stderr).toContain("--model requires a value");
+      expect(readFileSync(configPath, "utf8")).toBe(original);
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

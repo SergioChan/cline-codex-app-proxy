@@ -80,10 +80,14 @@ const helpEntries: Record<string, HelpEntry> = {
     ],
   },
   cline: {
-    usage: "ocx cline <setup|status|remove>",
-    summary: "Configure Cline Coding Plan models for the Codex desktop App.",
+    usage: "ocx cline <setup|models|status|remove>",
+    summary: "Configure ClinePass and explicit Cline API models for the Codex desktop App.",
     details: [
       "Setup reads the API key from a hidden prompt, stdin, or a mode-0600 file.",
+      "Use `ocx cline setup --configure-models` for an interactive model picker.",
+      "Automation can repeat `--model <provider/model>`, use `--all-clinepass-models`, or `--reset-models`.",
+      "A key-only setup rerun preserves the currently managed model selection.",
+      "Use `ocx cline models` to inspect the bundled ClinePass snapshot and configured custom IDs.",
       "It preserves all non-Cline providers and never accepts an API key in argv.",
     ],
   },
@@ -152,7 +156,7 @@ Usage:
   ocx restart                  Stop and restart the proxy
   ocx health [--json]          Check proxy health (exit 0=healthy, 1=not)
   ocx provider <sub>          Manage providers (list|add|remove|show|set-default)
-  ocx cline <sub>             Configure Cline models for Codex App (setup|status|remove)
+  ocx cline <sub>             Configure Cline models for Codex App (setup|models|status|remove)
   ocx models [--json]         List available models from configured providers
   ocx claude [args...]        Launch Claude Code wired to the proxy (model discovery on)
   ocx help [command]          Show help

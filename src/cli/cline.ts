@@ -11,6 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import {
   atomicWriteFile,
   getConfigDir,
@@ -18,21 +19,33 @@ import {
   saveConfig,
 } from "../config";
 import {
+  CLINEPASS_CATALOG_UPDATED_AT,
+  CLINEPASS_MODELS,
   CLINE_MODELS,
   CLINE_PROVIDER_ID,
   configureCline,
   isManagedClineProvider,
+  normalizeClineModelIds,
   removeCline,
   type ClineSetupState,
 } from "../cline/config";
+import { routedSlug } from "../providers/slug-codec";
 import type { OcxConfig, OcxProviderConfig } from "../types";
 
 const STATE_FILE = "cline-codex-app-proxy-state.json";
 const LOCK_FILE = "cline-codex-app-proxy.lock";
 const USAGE = `Usage:
-  ocx cline setup [--api-key-stdin | --api-key-file <path>] [--adopt-existing-cline] [--json]
+  ocx cline setup [--api-key-stdin | --api-key-file <path>] [model options] [--adopt-existing-cline] [--json]
   ocx cline status [--json]
+  ocx cline models [--json]
   ocx cline remove [--json]`;
+
+const MODEL_OPTIONS_HELP = `Model options (choose at most one source):
+  --configure-models         Interactive ClinePass model picker
+  --model <provider/model>   Configure one model; repeat or use comma-separated IDs
+  --all-clinepass-models     Configure every model in the bundled ClinePass snapshot
+  --reset-models             Restore the Kimi K3 + GLM 5.2 defaults
+  --default-model <id>       Set the provider fallback; must be in the configured list`;
 
 function statePath(): string {
   return join(getConfigDir(), STATE_FILE);
@@ -97,8 +110,90 @@ function consumeFlagValue(args: string[], flag: string): string | undefined {
   if (index === -1) return undefined;
   if (index + 1 >= args.length) throw new Error(`${flag} requires a value.`);
   const value = args[index + 1];
+  if (value.startsWith("-")) throw new Error(`${flag} requires a value.`);
   args.splice(index, 2);
   return value;
+}
+
+function consumeFlagValues(args: string[], flag: string): string[] {
+  const values: string[] = [];
+  for (;;) {
+    const index = args.indexOf(flag);
+    if (index === -1) return values;
+    if (index + 1 >= args.length) throw new Error(`${flag} requires a value.`);
+    const value = args[index + 1];
+    if (value.startsWith("-")) throw new Error(`${flag} requires a value.`);
+    values.push(value);
+    args.splice(index, 2);
+  }
+}
+
+function configuredModelIds(provider: OcxProviderConfig | undefined): string[] {
+  const ids = provider?.models?.length
+    ? provider.models
+    : provider?.selectedModels?.length
+      ? provider.selectedModels
+      : CLINE_MODELS.map(model => model.id);
+  return [...ids];
+}
+
+function interactiveCandidates(currentIds: readonly string[]) {
+  const known = new Set(CLINEPASS_MODELS.map(model => model.id));
+  return [
+    ...CLINEPASS_MODELS.map(model => ({ id: model.id, displayName: model.displayName })),
+    ...currentIds
+      .filter(id => !known.has(id))
+      .map(id => ({ id, displayName: `Cline · ${id}` })),
+  ];
+}
+
+export function parseInteractiveModelSelection(
+  answer: string,
+  currentIds: readonly string[],
+): string[] | undefined {
+  const trimmed = answer.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.toLowerCase() === "all") {
+    return normalizeClineModelIds(CLINEPASS_MODELS.map(model => model.id));
+  }
+  if (trimmed.toLowerCase() === "default") {
+    return normalizeClineModelIds(CLINE_MODELS.map(model => model.id));
+  }
+
+  const candidates = interactiveCandidates(currentIds);
+  const ids = trimmed
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(token => {
+      if (!/^\d+$/.test(token)) return token;
+      const index = Number.parseInt(token, 10) - 1;
+      const candidate = candidates[index];
+      if (!candidate) throw new Error(`Unknown Cline model number: ${token}.`);
+      return candidate.id;
+    });
+  return normalizeClineModelIds([...new Set(ids)]);
+}
+
+async function readInteractiveModelSelection(currentIds: readonly string[]): Promise<string[] | undefined> {
+  if (!process.stdin.isTTY || !process.stderr.isTTY) {
+    throw new Error("--configure-models requires an interactive TTY. Use --model for automation.");
+  }
+  const selected = new Set(currentIds);
+  const candidates = interactiveCandidates(currentIds);
+  process.stderr.write(`\nClinePass models (official snapshot ${CLINEPASS_CATALOG_UPDATED_AT}):\n`);
+  candidates.forEach((model, index) => {
+    process.stderr.write(`  ${index + 1}. ${model.displayName} (${model.id})${selected.has(model.id) ? " [selected]" : ""}\n`);
+  });
+  process.stderr.write("You may also enter any Cline API provider/model ID. Unknown models use conservative text-only metadata.\n");
+  const readline = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = await readline.question(
+      'Models (numbers or IDs, comma-separated; "all"; "default"; Enter keeps selected): ',
+    );
+    return parseInteractiveModelSelection(answer, currentIds);
+  } finally {
+    readline.close();
+  }
 }
 
 function readAllStdin(): string {
@@ -214,15 +309,19 @@ function readStrictConfig(): OcxConfig {
 function statusPayload() {
   const config = readStrictConfig();
   const provider = config.providers[CLINE_PROVIDER_ID];
+  const ids = configuredModelIds(provider);
   return {
     configured: isManagedClineProvider(provider),
     baseUrl: provider?.baseUrl ?? null,
     credentialStored: typeof provider?.apiKey === "string" && provider.apiKey.trim().length > 0,
-    models: CLINE_MODELS.map(model => ({
-      id: model.id,
-      slug: model.slug,
-      displayName: provider?.modelDisplayNames?.[model.id] ?? null,
-      selected: provider?.selectedModels?.includes(model.id) ?? false,
+    defaultModel: provider?.defaultModel ?? null,
+    catalogUpdatedAt: CLINEPASS_CATALOG_UPDATED_AT,
+    models: ids.map(id => ({
+      id,
+      slug: routedSlug(CLINE_PROVIDER_ID, id),
+      displayName: provider?.modelDisplayNames?.[id] ?? `Cline · ${id}`,
+      selected: provider?.selectedModels?.includes(id) ?? false,
+      officialClinePass: CLINEPASS_MODELS.some(model => model.id === id),
     })),
     stateFile: existsSync(statePath()),
   };
@@ -233,14 +332,28 @@ async function handleSetup(args: string[]): Promise<void> {
   const fromStdin = consumeFlag(args, "--api-key-stdin");
   const keyFile = consumeFlagValue(args, "--api-key-file");
   const adoptExisting = consumeFlag(args, "--adopt-existing-cline");
-  if (args.length > 0) throw new Error(`Unknown argument(s): ${args.join(" ")}\n${USAGE}`);
+  const configureModels = consumeFlag(args, "--configure-models");
+  const allClinePassModels = consumeFlag(args, "--all-clinepass-models");
+  const resetModels = consumeFlag(args, "--reset-models");
+  const modelValues = consumeFlagValues(args, "--model");
+  const requestedDefaultModel = consumeFlagValue(args, "--default-model");
+  if (args.length > 0) throw new Error(`Unknown argument(s): ${args.join(" ")}\n${USAGE}\n${MODEL_OPTIONS_HELP}`);
   if (fromStdin && keyFile) throw new Error("Choose only one API key input method.");
+  const modelSourceCount = Number(configureModels)
+    + Number(allClinePassModels)
+    + Number(resetModels)
+    + Number(modelValues.length > 0);
+  if (modelSourceCount > 1) throw new Error(`Choose only one model source.\n${MODEL_OPTIONS_HELP}`);
+  if (configureModels && (fromStdin || wantsJson)) {
+    throw new Error("--configure-models cannot be combined with --api-key-stdin or --json. Use --model for automation.");
+  }
 
   const payload = await withConfigLock(async () => {
     const current = readStrictConfig();
     const existingState = loadState();
-    const existingKey = (existingState || adoptExisting) && isManagedClineProvider(current.providers[CLINE_PROVIDER_ID])
-      ? current.providers[CLINE_PROVIDER_ID]?.apiKey?.trim()
+    const currentProvider = current.providers[CLINE_PROVIDER_ID];
+    const existingKey = (existingState || adoptExisting) && isManagedClineProvider(currentProvider)
+      ? currentProvider?.apiKey?.trim()
       : undefined;
     const apiKey = fromStdin
       ? await readAllStdin()
@@ -248,7 +361,24 @@ async function handleSetup(args: string[]): Promise<void> {
         ? readKeyFile(keyFile)
         : existingKey || await readHiddenSecret("Cline API key: ");
 
-    const result = configureCline(current, apiKey, { adoptExisting, existingState });
+    const currentIds = existingState && isManagedClineProvider(currentProvider)
+      ? configuredModelIds(currentProvider)
+      : CLINE_MODELS.map(model => model.id);
+    let modelIds: string[] | undefined;
+    if (configureModels) modelIds = await readInteractiveModelSelection(currentIds);
+    else if (allClinePassModels) modelIds = CLINEPASS_MODELS.map(model => model.id);
+    else if (resetModels) modelIds = CLINE_MODELS.map(model => model.id);
+    else if (modelValues.length > 0) {
+      modelIds = normalizeClineModelIds(
+        modelValues.flatMap(value => value.split(",").map(id => id.trim())),
+      );
+    }
+    const result = configureCline(current, apiKey, {
+      adoptExisting,
+      existingState,
+      modelIds,
+      defaultModel: requestedDefaultModel,
+    });
     const previousState = existsSync(statePath()) ? readFileSync(statePath(), "utf8") : null;
     saveState(result.state);
     try {
@@ -267,7 +397,7 @@ async function handleSetup(args: string[]): Promise<void> {
   if (wantsJson) console.log(JSON.stringify(payload, null, 2));
   else {
     console.log("Cline provider configured without changing other providers or global preferences.");
-    console.log(`Models: ${CLINE_MODELS.map(model => model.displayName).join(", ")}`);
+    console.log(`Models: ${payload.models.filter(model => model.selected).map(model => model.displayName).join(", ")}`);
     console.log("Next: run `ocx service install`, then fully quit (Command-Q) and reopen Codex App.");
   }
 }
@@ -283,8 +413,43 @@ function handleStatus(args: string[]): void {
     console.log(`Credential stored: ${payload.credentialStored ? "yes" : "no"}`);
     console.log(`Managed setup state: ${payload.stateFile ? "yes" : "no"}`);
     for (const model of payload.models) {
-      console.log(`- ${model.displayName ?? model.id} (${model.slug})`);
+      console.log(`- ${model.displayName} (${model.slug})${model.id === payload.defaultModel ? " [default]" : ""}`);
     }
+  }
+}
+
+function handleModels(args: string[]): void {
+  const wantsJson = consumeFlag(args, "--json");
+  if (args.length > 0) throw new Error(`Unknown argument(s): ${args.join(" ")}\n${USAGE}`);
+  const config = readStrictConfig();
+  const provider = config.providers[CLINE_PROVIDER_ID];
+  const selected = new Set(provider?.selectedModels ?? []);
+  const officialIds = new Set(CLINEPASS_MODELS.map(model => model.id));
+  const rows = [
+    ...CLINEPASS_MODELS.map(model => ({
+      id: model.id,
+      slug: model.slug,
+      displayName: model.displayName,
+      selected: selected.has(model.id),
+      officialClinePass: true,
+    })),
+    ...configuredModelIds(provider)
+      .filter(id => !officialIds.has(id))
+      .map(id => ({
+        id,
+        slug: routedSlug(CLINE_PROVIDER_ID, id),
+        displayName: provider?.modelDisplayNames?.[id] ?? `Cline · ${id}`,
+        selected: selected.has(id),
+        officialClinePass: false,
+      })),
+  ];
+  if (wantsJson) {
+    console.log(JSON.stringify({ catalogUpdatedAt: CLINEPASS_CATALOG_UPDATED_AT, models: rows }, null, 2));
+    return;
+  }
+  console.log(`Official ClinePass snapshot (${CLINEPASS_CATALOG_UPDATED_AT}):`);
+  for (const model of rows) {
+    console.log(`- ${model.displayName} (${model.id})${model.selected ? " [selected]" : ""}${model.officialClinePass ? "" : " [custom]"}`);
   }
 }
 
@@ -314,6 +479,9 @@ export async function handleClineCommand(args: string[]): Promise<void> {
       return;
     case "status":
       handleStatus(args.slice(1));
+      return;
+    case "models":
+      handleModels(args.slice(1));
       return;
     case "remove":
       await handleRemove(args.slice(1));
